@@ -1643,6 +1643,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#key-links").innerHTML = (has ? `<button type="button" id="gh-forget">Schlüssel von diesem Gerät löschen</button>` : "")
       + (g ? `<a href="https://github.com/${esc(g.owner)}/${esc(g.repo)}/actions/workflows/daily.yml" target="_blank" rel="noopener">Ohne Schlüssel auf GitHub starten</a>` : "");
   }
+  function resumeRun() {
+    const a = store.get("go-run-active");
+    if (a && a.started && Date.now() - a.started < 45 * 60e3 && ghToken() && !runState) pollRun(a.started, a.retune);
+  }
   $("#run-opts").addEventListener("change", (e) => { const c = e.target.closest("input[data-o]"); if (!c) return; runOpts[c.dataset.o] = c.checked; store.set("go-run", runOpts); renderRunUi(); });
   $("#gh-save").addEventListener("click", async () => {
     const v = $("#gh-token").value.trim();
@@ -1685,30 +1689,58 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         body: JSON.stringify({ ref: "main", inputs: { notify: String(runOpts.notify), refresh_odds: String(runOpts.refresh_odds), retune: String(runOpts.retune) } }) });
       if (r.status === 401 || r.status === 403) throw new Error("Der Schlüssel wurde abgelehnt. Prüf, ob er für goaloracle gilt und «Actions: Read and write» hat.");
       if (!r.ok) throw new Error("GitHub antwortet mit Fehler " + r.status + ".");
-      pollRun(started);
+      pollRun(started, runOpts.retune);
     } catch (e) {
       setRunStatus(`<span class="neg-d">${esc(e.message || "Start fehlgeschlagen.")}</span>`);
       $("#run-btn").dataset.busy = ""; renderRunUi();
     }
   });
-  function pollRun(started) {
-    clearTimeout(pollT);
+  // Laufender Lauf: Sekunden-Timer für die Anzeige, GitHub-Abfrage alle 6 Sekunden.
+  // Der Start wird gespeichert, damit Timer und Status nach dem Neuladen weiterlaufen.
+  let runState = null, clockT = null;
+  const fmtDur = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  function drawRun() {
+    if (!runState) return;
+    const el = Date.now() - runState.started;
+    const phase = runState.run ? (runState.run.status === "queued" ? "Wartet auf GitHub" : "Rechnet") : "Wird gestartet";
+    setRunStatus(`<span class="live">${phase}</span> <b style="font-variant-numeric:tabular-nums">${fmtDur(el)}</b> · ${runState.retune ? "mit Optimierung 5–10 Minuten" : "meist 3–4 Minuten"}${runState.run ? ` · <a href="${esc(runState.run.html_url)}" target="_blank" rel="noopener" style="color:inherit">auf GitHub ansehen</a>` : ""}`);
+  }
+  function stopRun() {
+    clearInterval(clockT); clearTimeout(pollT); clockT = null; runState = null;
+    store.set("go-run-active", null);
+    $("#run-btn").dataset.busy = ""; renderRunUi();
+  }
+  function pollRun(started, retune) {
+    clearTimeout(pollT); clearInterval(clockT);
+    runState = { started, retune: !!retune, run: null };
+    store.set("go-run-active", { started, retune: !!retune });
+    $("#run-btn").dataset.busy = "1"; renderRunUi();
+    drawRun();
+    clockT = setInterval(drawRun, 1000);
     const tick = async () => {
+      if (!runState) return;
       try {
-        const r = await ghFetch("/actions/workflows/daily.yml/runs?per_page=1&event=workflow_dispatch");
-        const j = await r.json(), run = (j.workflow_runs || [])[0];
-        const mine = run && new Date(run.created_at).getTime() >= started - 60e3;
-        const secs = Math.round((Date.now() - started) / 1000), mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, "0");
-        if (!mine || run.status !== "completed") {
-          setRunStatus(`<span class="live">Läuft</span> ${mm}:${ss} · ${runOpts.retune ? "mit Optimierung 5–10 Minuten" : "meist 2–4 Minuten"}${run && mine ? ` · <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">auf GitHub ansehen</a>` : ""}`);
-          pollT = setTimeout(tick, 8000); return;
+        const r = await ghFetch("/actions/workflows/daily.yml/runs?per_page=3");
+        const j = await r.json();
+        const run = (j.workflow_runs || []).find((x) => new Date(x.created_at).getTime() >= started - 90e3);
+        if (run) runState.run = run;
+        if (run && run.status === "completed") {
+          clearInterval(clockT);
+          if (run.conclusion !== "success") {
+            setRunStatus(`<span class="neg-d">Lauf fehlgeschlagen.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`);
+            store.set("go-run-active", null); runState = null; $("#run-btn").dataset.busy = ""; renderRunUi(); return;
+          }
+          setRunStatus(`Fertig nach ${fmtDur(new Date(run.updated_at).getTime() - started)}. Neue Daten werden geladen …`);
+          runState = null; store.set("go-run-active", null);
+          setTimeout(reloadData, 12000);
+          return;
         }
-        if (run.conclusion !== "success") { setRunStatus(`<span class="neg-d">Lauf fehlgeschlagen.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`); $("#run-btn").dataset.busy = ""; renderRunUi(); return; }
-        setRunStatus("Fertig. Neue Daten werden geladen …");
-        setTimeout(reloadData, 15000);
-      } catch (e) { pollT = setTimeout(tick, 10000); }
+        drawRun();
+      } catch (e) { /* Netzwerk: einfach weiter versuchen */ }
+      if (Date.now() - started > 45 * 60e3) { setRunStatus("Der Lauf dauert ungewöhnlich lange. Schau auf GitHub nach."); stopRun(); return; }
+      pollT = setTimeout(tick, 6000);
     };
-    tick();
+    pollT = setTimeout(tick, 2500);
   }
   async function reloadData() {
     try {
@@ -1777,7 +1809,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (!data.odds.key) notes.push("<b>Noch ohne Marktquoten.</b> Tipps werden nach Wahrscheinlichkeit sortiert. Mit einem Odds-API-Key erkennt GoalOracle auch Value.");
     $("#notice").innerHTML = notes.join(" "); $("#notice").hidden = !notes.length;
     $("#model-note").textContent = `Modell: Dixon-Coles über ${data.model.club_teams} Clubs und ${data.model.club_matches.toLocaleString("de-CH")} Spiele, Heimvorteil ${data.model.home_adv.toFixed(2)}×. Wappen und Spielpläne: ESPN. Quoten: The Odds API, historisch football-data.co.uk.`;
-    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps(); renderModel();
+    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps(); renderModel(); resumeRun();
     route();
   }
   function fail() {
