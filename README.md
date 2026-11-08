@@ -2,81 +2,52 @@
 
 Predict the game. Beat the gut feeling.
 
-Analysiert jeden Morgen alle Premier-League-Teams, schickt die Tipps per Telegram und aktualisiert eine Web-App, die du mit Kollegen teilen kannst:
+Statistische Tipps für **Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League, Europa League, Conference League, Nations League** und die Pokale **FA Cup, League Cup, DFB-Pokal, Coppa Italia, Copa del Rey, Coupe de France**.
 
-- **Tipps** für die Spiele der nächsten 4 Tage: Wahrscheinlichkeiten 1/X/2, Tipp mit Sicherheit, Endresultat-Tipp, xG, Über 2.5, beide treffen
-- **Stärke-Ranking** aller 20 Teams mit erwarteten Toren für/gegen und Form der letzten 5 Spiele (S/U/N)
-- **Web-App** (Ordner `web/`) mit Tipps für 10 Tage, Resultat-Heatmap pro Spiel, Ranking und **Bilanz** (jeder Tipp wird nach dem Spiel ausgewertet)
+Jeden Morgen um 8 Uhr:
+1. lädt der Bot alle Resultate und Spielpläne (ESPN), historische Quoten, Ecken und Karten (football-data.co.uk) und aktuelle Marktquoten (The Odds API),
+2. trainiert ein gemeinsames Dixon-Coles-Modell über rund 600 Clubs (Ligen, Pokale und Europacups zusammen, damit Teams aus verschiedenen Ländern vergleichbar sind) plus ein eigenes Modell für Nationalteams,
+3. berechnet für jedes Spiel alle Märkte und Kombis im selben Spiel exakt aus der Resultat-Matrix,
+4. schickt die Top-Tipps per Telegram, aktualisiert die Web-App und wettet im Spielgeld-Konto mit.
 
-## Wie es funktioniert
+## Web-App
 
-1. Lädt die laufende Saison (Resultate + Spielplan) von football-data.org und die zwei Vorsaisons von football-data.co.uk.
-2. Trainiert ein **Dixon-Coles-Modell**: Jedes Team bekommt eine Angriffs- und Abwehrstärke, dazu Heimvorteil und eine Korrektur für tiefe Resultate (0:0, 1:1). Neuere Spiele zählen mehr.
-3. Berechnet für jedes Spiel die Wahrscheinlichkeit jedes Resultats von 0:0 bis 10:10. Daraus folgen 1X2, Endresultat usw.
+`https://<github-name>.github.io/goaloracle/`
 
-**Endresultat-Tipp:** Das wahrscheinlichste Resultat insgesamt. Passt es nicht zum 1X2-Tipp (z. B. Tipp «1», aber 1:1 am wahrscheinlichsten), steht zusätzlich das beste Resultat, das zum Tipp passt.
+- **Spiele**: alle Spiele der nächsten 7 Tage, antippen für beste Tipps, beste Kombis, alle Märkte und die Resultat-Heatmap. Oben Kombi-Vorschläge über mehrere Spiele.
+- **Testlauf**: *Rückblick simulieren* (Budget, Risiko, Einsatzart, Einzel- oder Kombiwetten über die letzten Saisons mit echten historischen Quoten) und *Spielgeld-Konto* (virtuelles Konto, das ab dem ersten Lauf täglich mitwettet).
+- **Ranking**: Europa Top 30 und Stärke-Tabellen der Top-5-Ligen.
+- **Bilanz**: jeder Tipp wird nach dem Spiel ausgewertet.
+- **Einstellungen** (Regler-Symbol oben rechts): Tipp-Arten ein/aus (Ecken und Karten standardmässig aus), Wettbewerbe, Risikoprofil, Sporttipp-Abschlag. Gilt pro Gerät.
 
-## Einrichtung (ca. 15 Minuten)
+## Einrichtung
 
-### 1. API-Token für die Fussballdaten
-Gratis registrieren auf <https://www.football-data.org/client/register>. Der Token kommt per Mail.
+GitHub-Secrets (*Settings → Secrets and variables → Actions*):
 
-### 2. Telegram-Bot
-1. In Telegram **@BotFather** öffnen → `/newbot` → Name wählen → du bekommst den **Bot-Token**.
-2. Deinem neuen Bot eine beliebige Nachricht schicken.
-3. Im Browser öffnen: `https://api.telegram.org/bot<DEIN_TOKEN>/getUpdates` → bei `"chat":{"id": ...}` steht deine **Chat-ID**.
+| Secret | Woher |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | @BotFather |
+| `TELEGRAM_CHAT_ID` | `https://api.telegram.org/bot<TOKEN>/getUpdates` |
+| `ODDS_API_KEY` | gratis auf <https://the-odds-api.com> (500 Credits/Monat) |
 
-### 3. GitHub
-1. Neues **privates** Repository anlegen und diesen Ordner hochladen.
-2. *Settings → Secrets and variables → Actions → New repository secret*, drei Secrets anlegen:
-   - `FOOTBALL_DATA_TOKEN`
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-3. *Actions → GoalOracle → Run workflow* zum ersten Testen.
+Ohne `ODDS_API_KEY` läuft alles, aber ohne Value-Erkennung und ohne Spielgeld-Wetten.
 
-Danach läuft der Bot täglich um 08:00 Uhr (Winterzeit) bzw. 09:00 Uhr (Sommerzeit). Die Uhrzeit änderst du in `.github/workflows/daily.yml`. Jeder Lauf speichert die neuen Tipps in `web/data.json`.
+GitHub Pages: *Settings → Pages → Source: GitHub Actions*. Das Repo muss öffentlich sein (Tokens bleiben in den Secrets geheim).
 
-### 4. Web-App auf Netlify
-1. Auf <https://app.netlify.com> **Add new project → Import an existing project → GitHub** wählen und das Repo `goaloracle` auswählen.
-2. Die Einstellungen kommen aus `netlify.toml` (Publish directory `web`, kein Build-Befehl). Einfach **Deploy** klicken.
-3. Unter *Project configuration → Change project name* den Namen `goaloracle` (oder `goaloracle-timeo`) wählen. Die Adresse ist dann `https://goaloracle.netlify.app`.
-4. Jedes Mal, wenn der Bot neue Tipps speichert, aktualisiert Netlify die Seite automatisch.
+## Anpassen
 
-Auf dem iPhone: Seite in Safari öffnen → Teilen → **Zum Home-Bildschirm**. Dann startet GoalOracle wie eine App.
+Alles in `config.py`: Wettbewerbe, Risikoprofile, Sporttipp-Abschlag, Regeln fürs Spielgeld-Konto (`PAPER`), wie viele Tage voraus Quoten geholt werden (spart Credits).
 
-## Lokal laufen lassen
+## Lokal
 
 ```bash
 pip install -r requirements.txt
-export FOOTBALL_DATA_TOKEN=...
-python bot.py --dry-run           # Ausgabe im Terminal, nichts senden
-python bot.py --days 7 --dry-run  # Tipps für die nächsten 7 Tage
-python bot.py --backtest --dry-run   # Trefferquote der letzten 180 Tage
-python bot.py --web web/data.json --no-telegram   # nur Web-Daten schreiben
-python tests/test_offline.py      # Selbsttest ohne Internet
-python tests/make_demo.py         # Demo-Daten (tests/demo.json) für Design-Tests
+python bot.py --dry-run          # alles rechnen, Telegram-Text nur anzeigen
+python tests/fake_world.py       # Offline-Test mit simulierter Fussballwelt
 ```
 
-## Backtest – wie gut ist er wirklich?
+## Ehrlich gesagt
 
-`--backtest` (oder in GitHub: *Run workflow → backtest*) tippt rückwirkend jeden Spieltag der letzten 180 Tage, jeweils nur mit den Daten, die vor dem Spieltag bekannt waren. Realistische Werte für so ein Modell:
+Buchmacher haben gute Modelle und eine Marge. Value-Tipps sind Tipps, bei denen das Modell anderer Meinung ist als der Markt, und das Modell kann sich irren. Der Testlauf zeigt, wie es in der Vergangenheit gelaufen wäre. Das ist keine Garantie für die Zukunft.
 
-| | typisch |
-|---|---|
-| 1X2 richtig | 50–55 % |
-| Exaktes Resultat | 10–13 % |
-| Log-Loss | ~0.98–1.00 |
-
-Die Buchmacher (auch Sporttipp) haben ähnlich gute oder bessere Modelle und eine Marge in den Quoten. Ein Tipp mit 55 % Wahrscheinlichkeit bringt nur Gewinn, wenn die Quote über 1.82 liegt (1 / 0.55).
-
-## Ideen für später
-
-- Sporttipp-Quoten eintragen → Bot zeigt nur Tipps mit **Value** (Modell-Wahrscheinlichkeit × Quote > 1)
-- Weitere Ligen (Bundesliga, Serie A …) – football-data.org deckt sie gratis ab
-- Verletzungen/Sperren als manuelle Anpassung
-
-## Hinweise
-
-- Gratis-Plan football-data.org: 10 Anfragen pro Minute, Resultate leicht verzögert. Der Bot braucht 1 Anfrage pro Lauf.
-- Fehlt eine Vorsaison (Quelle nicht erreichbar), läuft der Bot trotzdem und zeigt eine Warnung.
-- GitHub Actions ist für private Repos bis 2000 Minuten/Monat gratis; ein Lauf dauert ca. 1 Minute.
+Daten: ESPN (inoffizielle Schnittstelle, kann sich ändern), football-data.co.uk, The Odds API.
