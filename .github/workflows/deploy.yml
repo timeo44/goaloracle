@@ -1,0 +1,32 @@
+name: Webseite veröffentlichen
+
+# Läuft nur bei Änderungen an der Web-App (nicht bei den täglichen Bot-Läufen)
+on:
+  push:
+    branches: [main]
+    paths: ["web/index.html", "web/manifest.webmanifest", "web/*.png", "web/*.svg"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: goaloracle
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v5.0.0
