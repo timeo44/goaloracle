@@ -740,6 +740,16 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     return `<span class="form" aria-label="Form, ältestes Spiel links">${[...f].map((c, i) =>
       `<button type="button" class="fm ${c}" ${det ? `data-team="${esc(id)}" data-i="${off + i}"` : `data-tip="${full[c]}"`} aria-label="${full[c]}">${c}</button>`).join("")}</span>`;
   }
+  function openFormMatch(teamId, i) {
+    const x = ((data.forms || {})[teamId] || [])[i];
+    if (!x || !x[8]) return false;
+    const T = teamIndex(), t = T[teamId] || { id: teamId, name: "?", tla: "?" }, opp = T[x[1]] || { id: x[1], name: "Unbekannt", tla: "?" };
+    knownMatches[x[8]] = knownMatches[x[8]] || { id: x[8], comp: x[6], kickoff: x[5] + "T12:00:00Z", noTips: true,
+      home: x[4] ? t : opp, away: x[4] ? opp : t };
+    hideTip();
+    location.hash = "spiel-" + x[8];
+    return true;
+  }
   function formTip(id, i) {
     const x = data.forms[id][i];
     const [res, oppId, gf, ga, home, day, comp, et] = x;
@@ -748,7 +758,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const cname = (data.comp_names && data.comp_names[comp]) || compName(comp);
     return `<div class="tb-res"><i class="${res}">${res}</i>${word} ${gf}:${ga}${et ? " n. V." : ""}</div>
       <div class="tb-opp">${crest(opp, "sm")}<span>${home ? "gegen" : "bei"} <b>${esc(opp.name)}</b></span></div>
-      <div class="tb-meta">${esc(new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(day)))} · ${esc(cname)} · ${home ? "Heimspiel" : "Auswärtsspiel"}</div>`;
+      <div class="tb-meta">${esc(new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(day)))} · ${esc(cname)} · ${home ? "Heimspiel" : "Auswärtsspiel"}</div>
+      ${x[8] ? `<div class="tb-meta" style="opacity:1;margin-top:6px"><b>${matchMedia("(hover: hover)").matches ? "Klicken" : "Nochmals antippen"}</b> für den Spielbericht</div>` : ""}`;
   }
   const compName = (k, short) => data.comps[k] ? (short ? data.comps[k].short : data.comps[k].name) : k;
   const evTag = (o) => o.ev !== null && o.ev !== undefined
@@ -1665,7 +1676,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   document.addEventListener("click", (e) => {
     const el = tipTarget(e.target);
     if (el && (el.classList.contains("fm") || el.matches("th, dt, td, .ev, .lbl, span, g"))) {
-      if (el.classList.contains("fm") || el.closest("a")) { e.preventDefault(); e.stopPropagation(); }
+      if (el.classList.contains("fm") || el.closest("a") || el.closest("tr[data-href]")) { e.preventDefault(); e.stopPropagation(); }
+      const isForm = el.classList.contains("fm") && el.dataset.team;
+      // Form-Kästchen: Maus-Klick oder zweites Antippen öffnet den Spielbericht
+      if (isForm && (e.pointerType === "mouse" || tipFor === el) && openFormMatch(el.dataset.team, +el.dataset.i)) return;
       tipFor === el && e.pointerType !== "mouse" ? hideTip() : showTip(el);
       return;
     }
@@ -1676,7 +1690,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   // Tastatur: Fokus zeigt die Blase. Bei Maus/Finger übernimmt der Klick.
   document.addEventListener("focusin", (e) => { if (Date.now() - lastPointer < 600) return; const el = tipTarget(e.target); if (el) showTip(el); });
   document.addEventListener("focusout", () => { if (Date.now() - lastPointer > 600) hideTip(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideTip();
+    const el = e.target.closest && e.target.closest(".fm[data-team]");
+    if (el && e.key === "Enter") { e.preventDefault(); openFormMatch(el.dataset.team, +el.dataset.i); }
+  });
   window.addEventListener("scroll", hideTip, { passive: true });
   window.addEventListener("hashchange", hideTip);
 
