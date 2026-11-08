@@ -860,12 +860,22 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (location.hash.slice(1) === b.dataset.view) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     location.hash = b.dataset.view; window.scrollTo(0, 0);
   }));
-  // Neu laden: holt die neueste Version der Seite und der Daten (ohne Zwischenspeicher)
-  $("#reload").addEventListener("click", () => {
-    $("#reload").classList.add("spin");
-    const url = location.pathname + "?r=" + Date.now() + location.hash;
-    setTimeout(() => location.replace(url), 150);
+  // Neu laden: zuerst Seite und Daten frisch vom Server holen (überschreibt den Zwischenspeicher,
+  // wichtig für die Homescreen-App auf dem iPhone), dann die App komplett neu starten.
+  $("#reload").addEventListener("click", async () => {
+    const btn = $("#reload");
+    if (btn.classList.contains("spin")) return;
+    btn.classList.add("spin");
+    const fresh = (u) => fetch(u, { cache: "reload" }).catch(() => null);
+    const files = [location.pathname, "data.json", "paper.json", "history.json", "sim.json", "manifest.webmanifest"];
+    try {
+      await Promise.race([Promise.all(files.map(fresh)), new Promise((res) => setTimeout(res, 6000))]);
+      if ("caches" in window) { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); }
+    } catch (e) { /* trotzdem neu laden */ }
+    location.replace(location.pathname + "?r=" + Date.now() + location.hash);
   });
+  // Nach dem Neuladen die Adresse bereinigen
+  if (/[?&]r=\d+/.test(location.search)) window.history.replaceState(null, "", location.pathname + location.hash);
   $("#gear").addEventListener("click", () => { location.hash = location.hash === "#einstellungen" ? lastList : "einstellungen"; window.scrollTo(0, 0); });
   window.addEventListener("hashchange", () => { route(); });
 
@@ -1405,7 +1415,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const id = $("#view-spiel").dataset.id; if (id && summaries[id]) renderReport(id, data.upcoming.find((x) => x.id === id));
   });
 
-  document.addEventListener("click", (e) => { if (e.target.closest("[data-back]")) { history.length > 1 ? history.back() : (location.hash = "spiele"); } });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-back]")) { window.history.length > 1 ? window.history.back() : (location.hash = "spiele"); } });
 
   // ---------- Testlauf: Rückblick ----------
   const simState = store.get("go-sim") || {};
