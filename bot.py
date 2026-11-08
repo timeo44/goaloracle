@@ -195,6 +195,7 @@ def main():
     shown = {u[s]["id"] for u in upcoming for s in ("home", "away")} | \
             {r["team"]["id"] for rows in rankings.values() for r in rows}
     data["forms"] = {t: fdet[t] for t in shown if t in fdet}
+    data["ratings"] = E.team_ratings(pr, rankings, shown, events, now)
     opp = {x[1] for t in data["forms"] for x in data["forms"][t]}
     data["teams"] = {t: info[t] for t in opp if t in info}
     write_json(WEB / "data.json", data)

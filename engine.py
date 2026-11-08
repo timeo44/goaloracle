@@ -105,7 +105,7 @@ def team_info(events):
 
 
 def form_details(events) -> dict[str, list]:
-    """Letzte 5 Spiele je Team: [Ergebnis, Gegner-ID, Tore, Gegentore, Heim 1/0, Datum, Wettbewerb, Verl. 1/0]."""
+    """Letzte 10 Spiele je Team: [Ergebnis, Gegner-ID, Tore, Gegentore, Heim 1/0, Datum, Wettbewerb, Verl. 1/0, Spiel-ID]."""
     res = defaultdict(list)
     for e in sorted(events, key=lambda e: e["date"]):
         if e["completed"] and e["hs"] is not None and e["status"] in FINAL_90 | FINAL_ET:
@@ -113,14 +113,14 @@ def form_details(events) -> dict[str, list]:
             et = 0 if e["status"] in FINAL_90 else 1
             r = "U" if hs == as_ else ("S" if hs > as_ else "N")
             day = e["date"][:10]
-            res[h].append([r, a, hs, as_, 1, day, e["slug"], et])
-            res[a].append([{"S": "N", "N": "S", "U": "U"}[r], h, as_, hs, 0, day, e["slug"], et])
-    return {k: v[-5:] for k, v in res.items()}
+            res[h].append([r, a, hs, as_, 1, day, e["slug"], et, e["id"]])
+            res[a].append([{"S": "N", "N": "S", "U": "U"}[r], h, as_, hs, 0, day, e["slug"], et, e["id"]])
+    return {k: v[-10:] for k, v in res.items()}
 
 
 def form_of(events, now, details=None):
     details = details or form_details(events)
-    return {k: "".join(x[0] for x in v) for k, v in details.items()}
+    return {k: "".join(x[0] for x in v[-5:]) for k, v in details.items()}
 
 
 def r(x, d=4):
@@ -171,8 +171,8 @@ def update_history(prev: list[dict], upcoming: list[dict], events_by_id: dict, n
     for u in upcoming:
         if parse_date(u["kickoff"]) > now:  # letzter Stand vor Anpfiff zählt
             hist[u["id"]] = {"id": u["id"], "kickoff": u["kickoff"], "comp": u["comp"],
-                             "home": {k: u["home"].get(k, "") for k in ("name", "tla", "logo")},
-                             "away": {k: u["away"].get(k, "") for k in ("name", "tla", "logo")},
+                             "home": {k: u["home"].get(k, "") for k in ("id", "name", "tla", "logo")},
+                             "away": {k: u["away"].get(k, "") for k in ("id", "name", "tla", "logo")},
                              "p": u["p"], "tip": u["tip"], "score": u["score"][:2], "xg": u["xg"],
                              "pick": u["pick"], "result": None}
             singles, combos = top_options(u["m"], u["odds"] if u["known"] else {})
@@ -289,6 +289,8 @@ def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now:
     allowed = set()
     if "1X2" in cfg["markets"]:
         allowed |= {"1", "X", "2"}
+    # Strategie: pro Spiel der beste Tipp der App, der eine echte Marktquote hat.
+    # Value-Tipps zuerst, sonst der wahrscheinlichste Tipp im Quotenbereich des Risikoprofils.
     cands = []
     for u in upcoming:
         if u["id"] in placed or not u["odds"] or not u["known"]:
@@ -296,17 +298,21 @@ def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now:
         ko = parse_date(u["kickoff"])
         if not (now < ko <= now + timedelta(hours=24)):
             continue
+        best = None
         for k, o in u["odds"].items():
             if not (k in allowed or ("OU" in cfg["markets"] and k[0] in "OU")):
                 continue
             p = u["m"].get(k)
-            if p is None:
+            if p is None or not (R["min_odds"] <= o <= R["max_odds"]):
                 continue
-            eff = o
-            ev = p * eff - 1
-            if R["min_odds"] <= eff <= R["max_odds"] and ev >= R["min_ev"]:
-                cands.append((ev, u, k, p, eff))
-    cands.sort(key=lambda x: -x[0])
+            ev = p * o - 1
+            score = (1, ev) if ev >= R["min_ev"] else (0, p)
+            if best is None or score > best[0]:
+                best = (score, ev, u, k, p, o)
+        if best:
+            cands.append(best)
+    cands.sort(key=lambda x: x[0], reverse=True)
+    cands = [c[1:] for c in cands]
     used = set()
     n = 0
     for ev, u, k, p, eff in cands:
@@ -362,6 +368,42 @@ def build_rankings(pr: Predictor, events, info, form, now) -> dict:
         out[slug] = sorted(rows, key=lambda x: x["gf"] - x["ga"], reverse=True)
     europe = [row(t, s) for s, teams in by_league.items() for t in teams if goals.knows(t)]
     out["europa"] = sorted(europe, key=lambda x: x["gf"] - x["ga"], reverse=True)[:30]
+    return out
+
+
+def team_ratings(pr: Predictor, rankings: dict, teams: set[str], events, now) -> dict:
+    """Stärke je Team (erwartete Tore für/gegen gegen ein Durchschnittsteam) und Ranking-Plätze."""
+    out = {}
+    rank_eu = {r["team"]["id"]: i + 1 for i, r in enumerate(rankings.get("europa", []))}
+    rank_lg = {}
+    for slug, rows in rankings.items():
+        if slug != "europa":
+            for i, r in enumerate(rows):
+                rank_lg[r["team"]["id"]] = (slug, i + 1, len(rows))
+    since = now - timedelta(days=400)
+    league_of = defaultdict(lambda: defaultdict(int))
+    for e in events:
+        if e["completed"] and (e["slug"] in C.LEAGUE_SLUGS or e["slug"] in NATION_SLUGS) and parse_date(e["date"]) >= since:
+            league_of[e["home"]["id"]][e["slug"]] += 1
+            league_of[e["away"]["id"]][e["slug"]] += 1
+    for kind, m in (("club", pr.goals), ("nation", pr.nation)):
+        if not m:
+            continue
+        ref = list(m.att) if kind == "nation" else [r["team"]["id"] for rows in rankings.values() for r in rows if r["team"]["id"] in m.att]
+        if not ref:
+            continue
+        ma, md = np.mean([m.att[t] for t in ref]), np.mean([m.dfn[t] for t in ref])
+        for t in teams:
+            if t in m.att and t not in out:
+                gf = math.exp(m.att[t] + md + m.home_adv / 2)
+                ga = math.exp(ma + m.dfn[t] + m.home_adv / 2)
+                lg = max(league_of[t].items(), key=lambda x: x[1])[0] if league_of.get(t) else None
+                o = {"gf": round(gf, 2), "ga": round(ga, 2), "kind": kind, "league": lg, "games": m.games.get(t, 0)}
+                if t in rank_eu:
+                    o["rank_eu"] = rank_eu[t]
+                if t in rank_lg:
+                    o["rank_lg"] = list(rank_lg[t])
+                out[t] = o
     return out
 
 

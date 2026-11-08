@@ -370,6 +370,15 @@ form.sim { display: grid; gap: 14px; }
 .status.open, .status.void { background: var(--sunken); color: var(--muted); }
 .status.exact { background: var(--good); color: var(--surface); }
 
+/* ---------- Team-Seite ---------- */
+a.team-link { color: inherit; text-decoration: none; display: grid; justify-items: center; gap: 8px; border-radius: var(--radius); padding: 4px; }
+a.team-link:hover .tname { text-decoration: underline; text-underline-offset: 3px; }
+.team-hero { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 16px; }
+.team-hero h2 { margin: 0; font: 700 30px/1.05 var(--font-display); text-transform: uppercase; letter-spacing: .02em; text-wrap: balance; }
+.team-hero .sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+.res { font: 700 12px/1 var(--font-display); padding: 4px 6px; border-radius: 3px; color: var(--surface); }
+.res.S { background: var(--good); } .res.U { background: var(--draw); } .res.N { background: var(--bad); }
+
 /* ---------- Modell-Panel ---------- */
 .model-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) { .model-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .model-grid > * + * { border-left: 1px solid var(--line); } }
@@ -449,6 +458,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-spiel" hidden></section>
+  <section class="view" id="view-team" hidden></section>
 
   <section class="view" id="view-tipps" hidden>
     <div class="tipbar">
@@ -487,6 +497,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
             <div class="seg" id="s-mode"><button type="button" data-v="fix">Fix CHF</button><button type="button" data-v="percent" aria-pressed="true">% vom Konto</button><button type="button" data-v="kelly">Kelly</button></div>
           </div>
           <div class="field" id="s-stake-f"><label for="s-stake" id="s-stake-l">Prozent pro Tipp</label><input class="input" id="s-stake" type="number" min="0.01" step="any" inputmode="decimal" value="2"></div>
+          <div class="field"><span class="lbl" data-tip="Favoriten: pro Spiel der wahrscheinlichste Tipp im Quotenbereich. Value: nur Tipps, bei denen die Quote höher ist als die Chance laut Prognose.">Strategie</span>
+            <div class="seg" id="s-strat"><button type="button" data-v="fav" aria-pressed="true">Favoriten</button><button type="button" data-v="value" aria-pressed="false">Value</button></div>
+          </div>
           <div class="field"><span class="lbl" data-tip="Kombiniert = Modell und Marktquoten gemischt, so wie die App heute tippt. Nur Modell zeigt, was das reine Modell gebracht hätte.">Prognose</span>
             <div class="seg" id="s-mix"><button type="button" data-v="mix" aria-pressed="true">Modell + Markt</button><button type="button" data-v="model" aria-pressed="false">Nur Modell</button></div>
           </div>
@@ -719,12 +732,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     box.textContent = img.dataset.tla;
   }, true);
   function formHtml(team, fallback) {
-    const id = team && team.id, det = (data.forms && id && data.forms[id]) || null;
+    const id = team && team.id, all = (data.forms && id && data.forms[id]) || null;
+    const off = all ? Math.max(0, all.length - 5) : 0, det = all ? all.slice(off) : null;
     const f = det ? det.map((x) => x[0]).join("") : (fallback || (team && team.form) || "");
     if (!f) return "";
     const full = { S: "Sieg", U: "Unentschieden", N: "Niederlage" };
     return `<span class="form" aria-label="Form, ältestes Spiel links">${[...f].map((c, i) =>
-      `<button type="button" class="fm ${c}" ${det ? `data-team="${esc(id)}" data-i="${i}"` : `data-tip="${full[c]}"`} aria-label="${full[c]}">${c}</button>`).join("")}</span>`;
+      `<button type="button" class="fm ${c}" ${det ? `data-team="${esc(id)}" data-i="${off + i}"` : `data-tip="${full[c]}"`} aria-label="${full[c]}">${c}</button>`).join("")}</span>`;
   }
   function formTip(id, i) {
     const x = data.forms[id][i];
@@ -742,19 +756,20 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const quoteTxt = (o) => o.odds ? `Quote ${o.odds.toFixed(2)}` : `faire Quote ${o.fair.toFixed(2)}`;
 
   // ---------- Navigation ----------
-  const VIEWS = ["spiele", "spiel", "tipps", "testlauf", "ranking", "bilanz", "einstellungen"];
+  const VIEWS = ["spiele", "spiel", "team", "tipps", "testlauf", "ranking", "bilanz", "einstellungen"];
   let lastList = "spiele";
   function route() {
     const h = location.hash.slice(1);
-    let v = h.startsWith("spiel-") ? "spiel" : VIEWS.includes(h) ? h : "spiele";
+    let v = h.startsWith("spiel-") ? "spiel" : h.startsWith("team-") ? "team" : VIEWS.includes(h) ? h : "spiele";
     VIEWS.forEach((x) => ($("#view-" + x).hidden = x !== v));
-    const tabV = v === "spiel" ? "spiele" : v;
+    const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v;
     $$(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === tabV)));
     $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
+    if (v === "team") renderTeam(h.slice(5));
     if (v === "testlauf") ensureSim();
     if (v === "tipps") renderTipps();
-    if (v !== "spiel" && v !== "einstellungen") lastList = v;
+    if (v !== "spiel" && v !== "team" && v !== "einstellungen") lastList = v;
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.view; window.scrollTo(0, 0); }));
   $("#gear").addEventListener("click", () => { location.hash = location.hash === "#einstellungen" ? lastList : "einstellungen"; window.scrollTo(0, 0); });
@@ -967,9 +982,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <div class="match-hero">
         <div class="hero-meta">${esc(compName(u.comp))} · ${esc(fDay.format(d))}, ${fTime.format(d)}${u.neutral ? " · neutraler Platz" : ""}</div>
         <div class="hero-teams">
-          <div class="hero-team">${crest(u.home, "lg")}<span class="tname">${esc(u.home.name)}</span>${formHtml(u.home)}</div>
+          <div class="hero-team">${teamLink(u.home, `${crest(u.home, "lg")}<span class="tname">${esc(u.home.name)}</span>`)}${formHtml(u.home)}</div>
           <div class="hero-score"><span class="lbl" data-tip="Das wahrscheinlichste Endresultat. Auch das wahrscheinlichste Resultat tritt meist nur in 10 bis 20 % der Fälle ein.">Resultat-Tipp</span><div class="bug"><span>${u.score[0]}</span><span>${u.score[1]}</span></div><span class="muted" style="font-size:12px">${pct(u.score[2])} wahrscheinlich</span></div>
-          <div class="hero-team">${crest(u.away, "lg")}<span class="tname">${esc(u.away.name)}</span>${formHtml(u.away)}</div>
+          <div class="hero-team">${teamLink(u.away, `${crest(u.away, "lg")}<span class="tname">${esc(u.away.name)}</span>`)}${formHtml(u.away)}</div>
         </div>
         <div class="probs" style="padding:0">
           <div class="bar"><i class="h" style="width:${u.p[0] * 100}%"></i><i class="d" style="width:${u.p[1] * 100}%"></i><i class="a" style="width:${u.p[2] * 100}%"></i></div>
@@ -999,6 +1014,56 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       </div>`;
     window.scrollTo(0, 0);
   }
+  // ---------- Team-Seite ----------
+  const knownMatches = {};
+  function teamIndex() {
+    const T = Object.assign({}, data.teams || {});
+    data.upcoming.forEach((u) => { T[u.home.id] = T[u.home.id] || u.home; T[u.away.id] = T[u.away.id] || u.away; });
+    Object.values(data.rankings || {}).forEach((rows) => rows.forEach((r) => (T[r.team.id] = T[r.team.id] || r.team)));
+    return T;
+  }
+  function teamLink(t, inner) {
+    return t && t.id ? `<a class="team-link" href="#team-${esc(t.id)}" aria-label="Team ${esc(t.name)}">${inner}</a>` : inner;
+  }
+  function renderTeam(id) {
+    const el = $("#view-team"), T = teamIndex(), t = T[id];
+    if (!t) { el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="empty"><strong>Team nicht gefunden</strong>Zu diesem Team gibt es aktuell keine Daten.</div>`; return; }
+    const R = (data.ratings || {})[id] || {}, det = ((data.forms || {})[id] || []).slice().reverse();
+    const lgName = R.league ? ((data.comp_names || {})[R.league] || compName(R.league)) : (R.kind === "nation" ? "Nationalteam" : "");
+    const diff = R.gf != null ? R.gf - R.ga : null;
+    const fact = (k, v, sub, tip) => `<div class="kpi"><dt${tip ? ` data-tip="${esc(tip)}"` : ""}>${k}</dt><dd>${v}${sub ? `<small>${sub}</small>` : ""}</dd></div>`;
+    const next = data.upcoming.filter((u) => u.home.id === id || u.away.id === id);
+    det.forEach((x) => {
+      const opp = T[x[1]] || { id: x[1], name: "Unbekannt", tla: "?" };
+      const me = { id, name: t.name, tla: t.tla, logo: t.logo };
+      knownMatches[x[8]] = { id: x[8], comp: x[6], kickoff: x[5] + "T12:00:00Z", noTips: true,
+        home: x[4] ? me : opp, away: x[4] ? opp : me };
+    });
+    const rows = det.map((x) => {
+      const opp = T[x[1]] || { name: "Unbekannt", tla: "?", logo: "" };
+      const cname = (data.comp_names || {})[x[6]] || compName(x[6], true);
+      return `<tr ${x[8] ? `data-href="#spiel-${esc(x[8])}" tabindex="0"` : ""}><td class="muted">${esc(fDate.format(new Date(x[5])))}</td>
+        <td><span class="t">${crest(opp, "sm")}<span>${x[4] ? "" : "@ "}${esc(opp.name)}</span></span></td>
+        <td class="hide-sm muted">${esc(cname)}</td>
+        <td class="num"><b>${x[2]}:${x[3]}</b>${x[7] ? ` <span class="muted">n.V.</span>` : ""}</td><td><span class="res ${x[0]}">${x[0]}</span></td></tr>`;
+    }).join("");
+    el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button>
+      <div class="team-hero">${crest(t, "lg")}<div><h2>${esc(t.name)}</h2><div class="sub">${esc(lgName)}${R.rank_lg ? ` · Platz ${R.rank_lg[1]} von ${R.rank_lg[2]} im Stärke-Ranking` : ""}</div><div style="margin-top:8px">${formHtml(t)}</div></div></div>
+      <dl class="kpis" style="margin-top:14px">
+        ${fact("Stärke", diff != null ? `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}` : "–", "erwartete Tordifferenz pro Spiel", "Tore + minus Tore − gegen ein durchschnittliches Team.")}
+        ${fact("Tore +", R.gf != null ? R.gf.toFixed(2) : "–", "pro Spiel gegen Durchschnitt", R.kind === "nation" ? "Gegen ein durchschnittliches Nationalteam." : "Gegen ein durchschnittliches Team der Top-5-Ligen.")}
+        ${fact("Tore −", R.ga != null ? R.ga.toFixed(2) : "–", "Gegentore pro Spiel")}
+        ${fact("Europa", R.rank_eu ? "#" + R.rank_eu : "–", R.rank_eu ? "im Top-30-Ranking" : "nicht unter den Top 30", "Platz im Stärke-Ranking über alle Top-5-Ligen.")}
+      </dl>
+      ${next.length ? `<h2 class="sec" style="margin-top:22px">Nächste Spiele</h2><div class="grid">${next.map(card).join("")}</div>` : ""}
+      <h2 class="sec" style="margin-top:22px">Letzte Spiele</h2>
+      ${rows ? `<div class="panel table-wrap"><table class="rank" id="team-log"><thead><tr><th>Datum</th><th>Gegner</th><th class="hide-sm">Wettbewerb</th><th class="num">Resultat</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="note">Antippen öffnet den Spielbericht mit Torschützen, Karten und Statistik.</p>` : `<div class="empty">Keine Spiele in den Daten.</div>`}`;
+    window.scrollTo(0, 0);
+  }
+  $("#view-team").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href.slice(1); });
+  $("#view-team").addEventListener("keydown", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr && e.key === "Enter") location.hash = tr.dataset.href.slice(1); });
+
   // ---------- Spielbericht (live oder beendet) ----------
   const ICON = {
     goal: '<circle class="ic-ball" r="7"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z"/>',
@@ -1076,6 +1141,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     return {
       home: { id: home.team.id, name: home.team.shortDisplayName || home.team.displayName, score: +home.score || 0 },
       away: { id: away.team.id, name: away.team.shortDisplayName || away.team.displayName, score: +away.score || 0 },
+      date: comp.date || (j.header && j.header.competitions && j.header.competitions[0].date) || null,
       state: st.state, completed: !!st.completed, statusName: st.name || "", detail: st.shortDetail || st.detail || "",
       events: evs, stats,
       maxMin: Math.max(90, ...evs.map((e) => e.min.base)) > 90 ? 120 : 90,
@@ -1170,28 +1236,28 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="panel"><div class="empty">Spiel wird geladen …</div></div>`;
     loadHistory().then(() => {
       const h = history.find((x) => x.id === id);
-      const base = h || (u && { ...u, tips: rankOptions(options(u).filter((o) => groupOf(o.k) !== "combo")).slice(0, 5).map((o) => ({ key: o.k, p: o.p, odds: o.odds })),
+      const base = h || knownMatches[id] || (u && { ...u, tips: rankOptions(options(u).filter((o) => groupOf(o.k) !== "combo")).slice(0, 5).map((o) => ({ key: o.k, p: o.p, odds: o.odds })),
         combos: rankOptions(options(u).filter((o) => groupOf(o.k) === "combo")).slice(0, 3).map((o) => ({ key: o.k, p: o.p, odds: o.odds })) });
       if (!base) { el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="empty"><strong>Spiel nicht gefunden</strong>Zu diesem Spiel gibt es keine gespeicherten Tipps.</div>`; return; }
       const draw = (S, err) => {
         if (location.hash !== "#spiel-" + id) return;
-        const d = new Date(base.kickoff);
+        const d = new Date((S && S.date) || base.kickoff);
         const score = S && S.state !== "pre" ? [S.home.score, S.away.score] : null;
         const status = !S ? "" : S.state === "in" ? `<span class="live">Live ${esc(S.detail)}</span>` : S.completed ? esc(S.detail || "Beendet") : "Noch nicht angepfiffen";
         el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button>
           <div class="match-hero">
             <div class="hero-meta">${esc(compName(base.comp))} · ${esc(fDay.format(d))}, ${fTime.format(d)}</div>
             <div class="hero-teams">
-              <div class="hero-team">${crest(base.home, "lg")}<span class="tname">${esc(base.home.name)}</span>${formHtml(base.home)}</div>
-              <div class="hero-score"><span class="lbl">${score ? "Resultat" : "Resultat-Tipp"}</span><div class="bug"><span>${score ? score[0] : base.score[0]}</span><span>${score ? score[1] : base.score[1]}</span></div><span class="muted" style="font-size:12.5px">${status}</span></div>
-              <div class="hero-team">${crest(base.away, "lg")}<span class="tname">${esc(base.away.name)}</span>${formHtml(base.away)}</div>
+              <div class="hero-team">${teamLink(base.home, `${crest(base.home, "lg")}<span class="tname">${esc(base.home.name)}</span>`)}${formHtml(base.home)}</div>
+              <div class="hero-score"><span class="lbl">${score ? "Resultat" : "Resultat-Tipp"}</span><div class="bug"><span>${score ? score[0] : base.score ? base.score[0] : "–"}</span><span>${score ? score[1] : base.score ? base.score[1] : "–"}</span></div><span class="muted" style="font-size:12.5px">${status}</span></div>
+              <div class="hero-team">${teamLink(base.away, `${crest(base.away, "lg")}<span class="tname">${esc(base.away.name)}</span>`)}${formHtml(base.away)}</div>
             </div>
             ${base.p ? `<div class="probs" style="padding:0"><div class="bar"><i class="h" style="width:${base.p[0] * 100}%"></i><i class="d" style="width:${base.p[1] * 100}%"></i><i class="a" style="width:${base.p[2] * 100}%"></i></div>
               <div class="legend"><span>1 <b>${pct(base.p[0])}</b></span><span class="muted">Prognose vor dem Spiel${base.xg ? ` · xG ${base.xg[0].toFixed(1)} – ${base.xg[1].toFixed(1)}` : ""}</span><span>2 <b>${pct(base.p[2])}</b></span></div></div>` : ""}
           </div>
           <div class="detail-grid">
             <div style="display:grid;gap:16px;min-width:0">
-              ${ourTipsHtml(base, S)}
+              ${base.noTips ? `<div class="panel"><div class="panel-b muted">Für dieses Spiel hatte GoalOracle keine Tipps gespeichert.</div></div>` : ourTipsHtml(base, S)}
               <div class="panel"><div class="panel-h"><h3>Spielverlauf</h3><span class="muted" style="font-size:12.5px">Symbole antippen für Details</span></div>
                 <div class="panel-b">${S ? `<div class="tl-tools" role="group" aria-label="Anzeigen">
                     <button type="button" class="chip" data-tl="corner" aria-pressed="${tlShow.corner !== false}">${iconSvg("corner", 14)} Eckbälle</button>
@@ -1240,6 +1306,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#s-leagues").innerHTML = ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1"].map((k) => `<button type="button" class="chip" data-v="${k}" aria-pressed="true">${esc(compName(k, true))}</button>`).join("");
     toggleChips($("#s-leagues")); toggleChips($("#s-markets"));
     segInit($("#s-mix"), simState.mix || "mix");
+    segInit($("#s-strat"), simState.strat || "fav");
     segInit($("#s-risk"), simState.risk || "ausgewogen", (v) => ($("#s-risk-note").textContent = riskNote(v)));
     $("#s-risk-note").textContent = riskNote(simState.risk || "ausgewogen");
     const stakeLbl = { fix: ["CHF pro Tipp", 10], percent: ["Prozent vom Konto pro Tipp", 2], kelly: ["Kelly-Anteil (0.1 bis 1)", 0.25] };
@@ -1271,10 +1338,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   function runSim() {
     if (!sim || !sim.rows.length) return;
     const num = (id, d) => { const v = parseFloat(String($(id).value).replace(",", ".")); return Number.isFinite(v) && v > 0 ? v : d; };
-    const cfg = { budget: num("#s-budget", 500), risk: segVal($("#s-risk")), mix: segVal($("#s-mix")),
+    const cfg = { budget: num("#s-budget", 500), risk: segVal($("#s-risk")), mix: segVal($("#s-mix")), strat: segVal($("#s-strat")),
       mode: segVal($("#s-mode")), stake: num("#s-stake", 1), legs: onChips($("#s-legs")).map(Number).sort(), max: Math.round(num("#s-max", 6)),
       from: $("#s-from").value, markets: onChips($("#s-markets")), leagues: onChips($("#s-leagues")) };
-    store.set("go-sim", { budget: cfg.budget, mix: cfg.mix, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
+    store.set("go-sim", { budget: cfg.budget, mix: cfg.mix, strat: cfg.strat, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
     const R = data.risk[cfg.risk];
     // Zeile: [datum, liga, heim, gast, p1, pX, p2, pO, pU, o1, oX, o2, oO, oU, tore heim, tore gast]
     const byDay = new Map();
@@ -1295,8 +1362,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       for (const c of cands) {
         if (!c.o) continue;
         const odds = c.o, ev = c.p * odds - 1;
-        if (odds < R.min_odds || odds > R.max_odds || ev < R.min_ev) continue;
-        if (!best || ev > best.ev) best = { ...c, odds, ev };
+        if (odds < R.min_odds || odds > R.max_odds) continue;
+        if (cfg.strat === "value" && ev < R.min_ev) continue;
+        const better = !best || (cfg.strat === "value" ? ev > best.ev : c.p > best.p);
+        if (better) best = { ...c, odds, ev };
       }
       if (best) { if (!byDay.has(r[0])) byDay.set(r[0], []); byDay.get(r[0]).push({ ...best, match: `${r[2]}–${r[3]}`, lg: r[1] }); }
     }
@@ -1384,7 +1453,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         ${paper.bets.length ? `<div class="table-wrap"><table class="rank"><thead><tr><th>Spiel</th><th>Partie</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>${[...open, ...done.slice().reverse()].slice(0, 60).map(row).join("")}</tbody></table></div>`
         : `<div class="empty"><strong>Noch keine Wetten</strong>Der Bot wettet nur, wenn Marktquoten vorliegen und ein Tipp genug Value hat. ${data.odds.key ? "" : "Dafür fehlt noch der Odds-API-Key."}</div>`}
       </div>
-      <p class="note">Virtuelles Geld. Der Bot setzt jeden Morgen auf Spiele der nächsten 24 Stunden, zu den aktuellen Marktquoten. Die Regeln stehen in config.py (PAPER).</p>`;
+      <p class="note">Virtuelles Geld. Der Bot setzt jeden Morgen auf die besten Tipps der App für Spiele der nächsten 24 Stunden, zu den aktuellen Marktquoten. Value-Tipps zuerst, sonst der wahrscheinlichste Tipp im Quotenbereich. Die Regeln stehen in config.py (PAPER).</p>`;
   }
   $("#tl-sim").addEventListener("click", () => { tlMode = "sim"; $("#sim-pane").hidden = false; $("#paper-pane").hidden = true; $("#tl-sim").setAttribute("aria-pressed", "true"); $("#tl-paper").setAttribute("aria-pressed", "false"); });
   $("#tl-paper").addEventListener("click", () => { tlMode = "paper"; $("#sim-pane").hidden = true; $("#paper-pane").hidden = false; $("#tl-paper").setAttribute("aria-pressed", "true"); $("#tl-sim").setAttribute("aria-pressed", "false"); renderPaper(); });
@@ -1409,13 +1478,15 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#rank").innerHTML = `<thead><tr><th class="pos" data-tip="${T.pos}">#</th><th>Team</th>${rankComp === "europa" ? `<th class="hide-sm" data-tip="${T.lg}">Liga</th>` : ""}<th class="num hide-sm" data-tip="${T.gf}">Tore +</th><th class="num hide-sm" data-tip="${T.ga}">Tore −</th><th class="num" data-tip="${T.diff}">Diff.</th><th class="hide-sm" data-tip="${T.str}">Stärke</th><th data-tip="${T.form}">Form</th></tr></thead><tbody>${rows.map((r, i) => {
       const diff = r.gf - r.ga, w = Math.abs(diff) / maxD * 50;
       const dTip = `${esc(r.team.name)} erzielt im Schnitt ${r.gf.toFixed(2)} Tore und kassiert ${r.ga.toFixed(2)} pro Spiel, also ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)} gegen ein Durchschnittsteam.`;
-      return `<tr><td class="pos">${i + 1}</td><td><span class="t">${crest(r.team, "sm")}<span>${esc(r.team.name)}</span></span></td>
+      return `<tr data-href="#team-${esc(r.team.id)}" tabindex="0"><td class="pos">${i + 1}</td><td><span class="t">${crest(r.team, "sm")}<span>${esc(r.team.name)}</span></span></td>
         ${rankComp === "europa" ? `<td class="hide-sm muted">${esc(compName(r.comp, true))}</td>` : ""}
         <td class="num hide-sm" data-tip="${esc(r.team.name)}: ${r.gf.toFixed(2)} erwartete Tore pro Spiel">${r.gf.toFixed(2)}</td><td class="num hide-sm" data-tip="${esc(r.team.name)}: ${r.ga.toFixed(2)} erwartete Gegentore pro Spiel">${r.ga.toFixed(2)}</td>
         <td class="num ${diff >= 0 ? "pos-d" : "neg-d"}" data-tip="${dTip}">${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}</td>
         <td class="hide-sm" data-tip="${dTip}"><span class="diffbar"><i style="${diff >= 0 ? `left:50%;width:${w}%;background:var(--good)` : `right:50%;width:${w}%;background:var(--bad)`}"></i></span></td>
         <td>${formHtml(r.team, r.form) || "–"}</td></tr>`; }).join("")}</tbody>`;
   }
+  $("#rank").addEventListener("click", (e) => { if (e.target.closest(".fm, [data-tip]:not(tr)")) return; const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href.slice(1); });
+  $("#rank").addEventListener("keydown", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr && e.key === "Enter") location.hash = tr.dataset.href.slice(1); });
   $("#rank-chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; rankComp = b.dataset.c; renderRanking(); });
 
   // ---------- Bilanz ----------
@@ -1478,6 +1549,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const hl = P.xi ? Math.round(Math.log(2) / P.xi) : null;
     const fact = (t, v, sub, tip) => `<div class="fact"><dt${tip ? ` data-tip="${esc(tip)}"` : ""}>${t}</dt><dd>${v}${sub ? `<small>${sub}</small>` : ""}</dd></div>`;
     const ll = (v) => (v != null ? v.toFixed(3) : "–");
+    const marketNote = P.w != null && P.w < 0.1 ? `<p class="note" style="margin:10px 0 0">Im Rückblick waren die Marktquoten genauer als das Modell (Log-Loss ${ll(X.ll_market)} gegen ${ll(X.ll_model)}). Wo Quoten vorliegen, folgt die Prognose deshalb dem Markt. Bei Spielen ohne Quoten, bei Toren pro Team, Kombis, Ecken und Karten rechnet das eigene Modell.</p>` : "";
     $("#mdl-facts").innerHTML = `<dl class="facts">
       ${fact("Trefferquote 1X2", X.hit_blend != null ? pct(X.hit_blend) : "–", X.n ? `Rückblick, ${X.n} Spiele` : "noch nicht optimiert", "Wie oft der wahrscheinlichste Ausgang im Rückblick eingetreten ist (Modell und Markt kombiniert).")}
       ${fact("Log-Loss Modell", ll(X.ll_model), `Markt ${ll(X.ll_market)} · Mix ${ll(X.ll_blend)}`, "Misst, wie gut die Wahrscheinlichkeiten stimmen. Je tiefer, desto besser. Raten ergibt 1.099.")}
@@ -1485,7 +1557,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       ${fact("Schuss-Anteil", P.beta != null ? pct(P.beta) : "–", "Schüsse aufs Tor vs. Tore", "Wie stark die Schüsse aufs Tor in die erwarteten Tore einfliessen. Schüsse schwanken weniger als Tore.")}
       ${fact("Halbwertszeit", hl ? hl + " Tage" : "–", "so schnell verlieren alte Spiele Gewicht", "Ein Spiel von vor dieser Anzahl Tagen zählt noch halb so viel wie ein Spiel von heute.")}
       ${fact("Optimiert", P.tuned_at ? fDate.format(new Date(P.tuned_at)) : "–", "jeden Montag automatisch")}
-    </dl>`;
+    </dl>${marketNote}`;
     const feeds = [
       ["Resultate & Spielpläne (ESPN)", `${(F.espn_matches || 0).toLocaleString("de-CH")} Spiele · ${F.espn_comps || 0} Wettbewerbe`],
       ["Clubs im Modell", `${(M.club_teams || 0).toLocaleString("de-CH")} Teams`],
