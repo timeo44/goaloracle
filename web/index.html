@@ -575,7 +575,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           </div>
           <div class="toggle-list" id="run-opts">
             <label class="toggle" for="o-notify"><span>Telegram-Nachricht senden<small>Schickt die Top-Tipps gleich nach dem Lauf.</small></span><span class="switch"><input type="checkbox" id="o-notify" data-o="notify"><i></i></span></label>
-            <label class="toggle" for="o-odds"><span>Quoten neu laden<small id="o-odds-sub">Holt aktuelle Marktquoten. Kostet etwa 2 Credits pro Wettbewerb.</small></span><span class="switch"><input type="checkbox" id="o-odds" data-o="refresh_odds"><i></i></span></label>
+            <label class="toggle" for="o-odds"><span>Quoten neu laden<small id="o-odds-sub">Holt aktuelle Marktquoten. Automatisch nur einmal täglich um 10 Uhr. Kostet etwa 2 Credits pro Wettbewerb.</small></span><span class="switch"><input type="checkbox" id="o-odds" data-o="refresh_odds"><i></i></span></label>
             <label class="toggle" for="o-retune"><span>Einstellungen neu optimieren<small>Rechnet den Rückblick neu. Dauert 5 bis 10 Minuten.</small></span><span class="switch"><input type="checkbox" id="o-retune" data-o="retune"><i></i></span></label>
           </div>
           <div class="panel-b" style="display:grid;gap:10px">
@@ -1632,7 +1632,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   function renderRunUi() {
     const has = !!ghToken(), g = GH();
     $$("#run-opts input").forEach((c) => (c.checked = !!runOpts[c.dataset.o]));
-    $("#o-odds-sub").textContent = `Holt aktuelle Marktquoten. Kostet etwa 2 Credits pro Wettbewerb${data.odds && data.odds.credits != null ? `, noch ${data.odds.credits} übrig` : ""}.`;
+    $("#o-odds-sub").textContent = `Automatisch nur einmal täglich um 10 Uhr. Kostet etwa 2 Credits pro Wettbewerb${data.odds && data.odds.credits != null ? `, noch ${data.odds.credits} übrig` : ""}.`;
     $("#gh-setup").hidden = has;
     const parts = [runOpts.notify ? "mit Telegram" : "ohne Telegram", runOpts.refresh_odds ? "neue Quoten" : "gespeicherte Quoten"];
     if (runOpts.retune) parts.push("mit Optimierung");
@@ -1812,6 +1812,23 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps(); renderModel(); resumeRun();
     route();
   }
+  // Offene App: alle 10 Minuten prüfen, ob der Bot neue Daten veröffentlicht hat, und still nachladen
+  function autoRefresh() {
+    if (window.GO_DATA) return;   // Vorschau mit eingebetteten Daten
+    setInterval(async () => {
+      if (document.hidden || runState) return;
+      try {
+        const d = await fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((r) => r.json());
+        if (!data || d.generated === data.generated) return;
+        const p = await fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const y = window.scrollY, h = location.hash;
+        data = d; paper = p; history = null; sim = null; simReady = false;
+        render();
+        if (location.hash === h) window.scrollTo(0, y);
+      } catch (e) { /* nächster Versuch in 10 Minuten */ }
+    }, 10 * 60e3);
+  }
+
   function fail() {
     $("#stamp").textContent = "Keine Daten";
     $("#matches").innerHTML = `<div class="empty"><strong>Noch keine Daten</strong>Die Datei data.json entsteht beim nächsten Lauf des Bots auf GitHub.</div>`;
@@ -1820,7 +1837,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   Promise.all([
     fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
     fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-  ]).then(([d, p]) => { data = d; paper = p; render(); }).catch(fail);
+  ]).then(([d, p]) => { data = d; paper = p; render(); autoRefresh(); }).catch(fail);
 })();
 </script>
 </body>

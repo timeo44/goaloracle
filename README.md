@@ -16,7 +16,7 @@ Jeden Montag früh optimiert sich das Modell selbst (Zeitgewichtung, Schuss-Ante
 
 In der App unter **Einstellungen → Modell**: Optionen wählen (Telegram senden, Quoten neu laden, neu optimieren) und **Modell jetzt neu rechnen**. Dafür einmalig einen GitHub-Schlüssel (Fine-grained token, nur dieses Repo, Actions: Read and write) auf dem Gerät speichern. Ohne Schlüssel führt der Knopf zur GitHub-Seite mit **Run workflow**.
 
-Quoten werden bei manuellen Läufen nur neu geholt, wenn die letzte Abfrage älter als 6 Stunden ist oder du es ausdrücklich wählst. Das schont die 500 Gratis-Credits.
+Alle 2 Stunden aktualisiert der Bot Resultate, Spielpläne, Bilanz und Prognosen (ohne Nachricht). Neue Quoten holt nur der 10-Uhr-Lauf oder ein manueller Lauf mit dem Schalter «Quoten neu laden». Das schont die 500 Gratis-Credits. Die offene App lädt neue Daten alle 10 Minuten selbst nach.
 
 ## Web-App
 

@@ -144,12 +144,12 @@ def main():
     form = E.form_of(events, now, fdet)
     by_id = {e["id"]: e for e in events}
 
-    # Quoten: neu laden höchstens alle 6 Stunden, ausser ausdrücklich gewünscht
+    # Quoten: automatisch höchstens einmal pro Tag (der 10-Uhr-Lauf holt sie ausdrücklich), sonst gespeicherte
     prev = load_json(WEB / "data.json", {})
     prev_odds = prev.get("odds", {})
     odds, credits, fetched = {}, prev_odds.get("credits"), prev_odds.get("fetched")
     key = os.getenv("ODDS_API_KEY")
-    stale = not fetched or (now - datetime.fromisoformat(fetched)) > timedelta(hours=6)
+    stale = not fetched or (now - datetime.fromisoformat(fetched)) > timedelta(hours=24)
     if key and (args.refresh_odds or stale):
         soon = [{**e, "dt": E.parse_date(e["date"])} for e in events
                 if e["slug"] in C.DISPLAY and not e["completed"] and e["status"] not in espn.DEAD]
@@ -158,7 +158,7 @@ def main():
         credits = c if c is not None else credits
         fetched = now.isoformat()
     elif key:
-        print("Quoten: letzte Abfrage jünger als 6 Stunden, verwende gespeicherte Quoten")
+        print("Quoten: letzte Abfrage jünger als 24 Stunden, verwende gespeicherte Quoten")
     for u in prev.get("upcoming", []):      # bekannte Quoten behalten
         if u.get("odds") and u["id"] not in odds:
             odds[u["id"]] = u["odds"]

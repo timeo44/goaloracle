@@ -1,5 +1,5 @@
 name: GoalOracle
-run-name: ${{ github.event_name == 'schedule' && 'Zeitplan' || 'Manueller Lauf' }}
+run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || 'Manueller Lauf' }}
 
 on:
   schedule:
@@ -9,6 +9,8 @@ on:
     - cron: "35 8 * * *"
     # Montag früh: Modell-Einstellungen per Rückblick neu optimieren (ohne Nachricht)
     - cron: "15 2 * * 1"
+    # Alle 2 Stunden: Resultate, Spielpläne, Bilanz und Prognosen aktualisieren (ohne Nachricht, ohne neue Quoten)
+    - cron: "5 */2 * * *"
   workflow_dispatch:
     inputs:
       notify:
@@ -49,8 +51,9 @@ jobs:
             OFF=$(TZ=Europe/Zurich date +%z)
             CRON="${{ github.event.schedule }}"
             if [ "$CRON" = "15 2 * * 1" ]; then ARGS="--retune"
-            elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00"
-            elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00"
+            elif [ "$CRON" = "5 */2 * * *" ]; then ARGS=""
+            elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds"
+            elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds"
             else RUN=false; fi
           else
             if [ "${{ inputs.notify }}" = "true" ]; then ARGS="$ARGS --notify"; fi
