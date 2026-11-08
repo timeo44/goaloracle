@@ -18,7 +18,7 @@ Jeden Morgen um 8 Uhr:
 - **Testlauf**: *Rückblick simulieren* (Budget, Risiko, Einsatzart, Einzel- oder Kombiwetten über die letzten Saisons mit echten historischen Quoten) und *Spielgeld-Konto* (virtuelles Konto, das ab dem ersten Lauf täglich mitwettet).
 - **Ranking**: Europa Top 30 und Stärke-Tabellen der Top-5-Ligen.
 - **Bilanz**: jeder Tipp wird nach dem Spiel ausgewertet.
-- **Einstellungen** (Regler-Symbol oben rechts): Tipp-Arten ein/aus (Ecken und Karten standardmässig aus), Wettbewerbe, Risikoprofil, Sporttipp-Abschlag. Gilt pro Gerät.
+- **Einstellungen** (Regler-Symbol oben rechts): Tipp-Arten ein/aus (Ecken und Karten standardmässig aus), Wettbewerbe, Risikoprofil. Gilt pro Gerät.
 
 ## Einrichtung
 
@@ -36,7 +36,7 @@ GitHub Pages: *Settings → Pages → Source: GitHub Actions*. Das Repo muss öf
 
 ## Anpassen
 
-Alles in `config.py`: Wettbewerbe, Risikoprofile, Sporttipp-Abschlag, Regeln fürs Spielgeld-Konto (`PAPER`), wie viele Tage voraus Quoten geholt werden (spart Credits).
+Alles in `config.py`: Wettbewerbe, Risikoprofile, Regeln fürs Spielgeld-Konto (`PAPER`), wie viele Tage voraus Quoten geholt werden (spart Credits).
 
 ## Lokal
 

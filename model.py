@@ -201,6 +201,9 @@ class DixonColes:
         res = minimize(lambda p: f(p, hflag), x0, jac=True, method="L-BFGS-B", bounds=bounds,
                        options={"maxiter": 3000})
         p = res.x
+        recent = days < 400
+        cnt = np.bincount(h[recent], minlength=n) + np.bincount(a[recent], minlength=n)
+        self.games = dict(zip(self.teams, cnt.tolist()))   # Spiele im letzten Jahr
         self.att = dict(zip(self.teams, p[:n]))
         self.dfn = dict(zip(self.teams, p[n:2 * n]))
         self.home_adv = float(p[2 * n])
@@ -208,8 +211,8 @@ class DixonColes:
         return self
 
     # ---------- Vorhersage ----------
-    def knows(self, team: str) -> bool:
-        return team in self.att
+    def knows(self, team: str, min_games: int = 0) -> bool:
+        return team in self.att and getattr(self, "games", {}).get(team, 0) >= min_games
 
     def _params(self, team: str) -> tuple[float, float]:
         if team in self.att:

@@ -41,8 +41,7 @@ def group_of(key: str) -> str:
     return "team"
 
 
-def pick_best(markets: dict, odds: dict, risk: str = "ausgewogen", groups=DEFAULT_GROUPS,
-              discount: float = C.SPORTTIPP_DISCOUNT) -> dict | None:
+def pick_best(markets: dict, odds: dict, risk: str = "ausgewogen", groups=DEFAULT_GROUPS) -> dict | None:
     """Bester Tipp eines Spiels: mit Quote nach Value, sonst nach Wahrscheinlichkeit."""
     R = C.RISK[risk]
     value, safe = [], []
@@ -51,13 +50,13 @@ def pick_best(markets: dict, odds: dict, risk: str = "ausgewogen", groups=DEFAUL
             continue
         o = odds.get(k)
         if o:
-            eff = o * (1 - discount)
+            eff = o
             ev = p * eff - 1
             if R["min_odds"] <= eff <= R["max_odds"] and ev >= R["min_ev"]:
                 value.append({"key": k, "p": round(p, 3), "odds": round(eff, 2), "ev": round(ev, 3)})
         fair = 1 / p
         if R["min_odds"] <= fair <= R["max_odds"]:
-            safe.append({"key": k, "p": round(p, 3), "odds": round(o * (1 - discount), 2) if o else None,
+            safe.append({"key": k, "p": round(p, 3), "odds": round(o, 2) if o else None,
                          "fair": round(fair, 2)})
     if value:
         return max(value, key=lambda x: x["ev"])
@@ -152,8 +151,8 @@ def predict_event(models: Models, e: dict) -> dict | None:
         if models.cards and models.cards.knows(h) and models.cards.knows(a):
             cards = models.cards.rates(h, a, e["neutral"])
     mk = all_markets(pred.matrix, corners, cards)
-    return {"pred": pred, "markets": mk, "corners": corners, "cards": cards,
-            "known": m.knows(h) and m.knows(a)}
+    reliable = m.knows(h, C.MIN_GAMES) and m.knows(a, C.MIN_GAMES)
+    return {"pred": pred, "markets": mk, "corners": corners, "cards": cards, "known": reliable}
 
 
 def build_upcoming(models, events, info, form, odds, now):
@@ -184,7 +183,7 @@ def build_upcoming(models, events, info, form, odds, now):
             "m": {k: r(v) for k, v in res["markets"].items()},
             "odds": o,
             "grid": [[r(v) for v in row] for row in mat],
-            "pick": pick_best(res["markets"], o),
+            "pick": pick_best(res["markets"], o if res["known"] else {}),
         })
     up.sort(key=lambda x: (x["kickoff"], x["comp"]))
     return up
@@ -292,7 +291,7 @@ def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now:
         allowed |= {"1", "X", "2"}
     cands = []
     for u in upcoming:
-        if u["id"] in placed or not u["odds"]:
+        if u["id"] in placed or not u["odds"] or not u["known"]:
             continue
         ko = parse_date(u["kickoff"])
         if not (now < ko <= now + timedelta(hours=24)):
@@ -303,7 +302,7 @@ def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now:
             p = u["m"].get(k)
             if p is None:
                 continue
-            eff = o * (1 - C.SPORTTIPP_DISCOUNT)
+            eff = o
             ev = p * eff - 1
             if R["min_odds"] <= eff <= R["max_odds"] and ev >= R["min_ev"]:
                 cands.append((ev, u, k, p, eff))
@@ -367,7 +366,8 @@ def build_rankings(models: Models, events, info, form, now) -> dict:
 
 # ---------------- Top-Tipps (Telegram) ----------------
 def top_tips(upcoming, now, hours=36, n=8):
-    soon = [u for u in upcoming if now < parse_date(u["kickoff"]) <= now + timedelta(hours=hours) and u["pick"]]
+    soon = [u for u in upcoming if now < parse_date(u["kickoff"]) <= now + timedelta(hours=hours)
+            and u["pick"] and u["known"]]
     with_val = sorted([u for u in soon if u["pick"].get("ev") is not None], key=lambda u: -u["pick"]["ev"])
     by_p = sorted([u for u in soon if u["pick"].get("ev") is None], key=lambda u: -u["pick"]["p"])
     singles = (with_val + by_p)[:n]

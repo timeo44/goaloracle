@@ -355,10 +355,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <div class="panel">
         <div class="panel-h"><h3>Einstellungen</h3><span class="muted" style="font-size:12.5px" id="sim-range"></span></div>
         <form class="sim panel-b" id="sim-form">
-          <div class="row2">
-            <div class="field"><label for="s-budget">Startbudget CHF</label><input class="input" id="s-budget" type="number" min="10" step="10" value="500"></div>
-            <div class="field"><label for="s-disc">Sporttipp-Abschlag %</label><input class="input" id="s-disc" type="number" min="0" max="20" step="1" value="7"></div>
-          </div>
+          <div class="field"><label for="s-budget">Startbudget CHF</label><input class="input" id="s-budget" type="number" min="1" step="any" inputmode="decimal" value="500"></div>
           <div class="field"><span class="lbl">Risiko</span>
             <div class="seg" id="s-risk"><button type="button" data-v="vorsichtig">Vorsichtig</button><button type="button" data-v="ausgewogen" aria-pressed="true">Ausgewogen</button><button type="button" data-v="mutig">Mutig</button></div>
             <span class="note" id="s-risk-note" style="margin:0"></span>
@@ -366,7 +363,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           <div class="field"><span class="lbl">Einsatz</span>
             <div class="seg" id="s-mode"><button type="button" data-v="fix">Fix CHF</button><button type="button" data-v="percent" aria-pressed="true">% vom Konto</button><button type="button" data-v="kelly">Kelly</button></div>
           </div>
-          <div class="field" id="s-stake-f"><label for="s-stake" id="s-stake-l">Prozent pro Tipp</label><input class="input" id="s-stake" type="number" min="0.1" step="0.5" value="2"></div>
+          <div class="field" id="s-stake-f"><label for="s-stake" id="s-stake-l">Prozent pro Tipp</label><input class="input" id="s-stake" type="number" min="0.01" step="any" inputmode="decimal" value="2"></div>
           <div class="field"><span class="lbl">Wettart</span>
             <div class="seg" id="s-legs"><button type="button" data-v="1" aria-pressed="true">Einzeltipps</button><button type="button" data-v="2">2er-Kombi</button><button type="button" data-v="3">3er-Kombi</button></div>
           </div>
@@ -375,7 +372,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           </div>
           <div class="field"><span class="lbl">Ligen</span><div class="checks" id="s-leagues"></div></div>
           <div class="row2">
-            <div class="field"><label for="s-max">Max. Tipps pro Tag</label><input class="input" id="s-max" type="number" min="1" max="30" value="6"></div>
+            <div class="field"><label for="s-max">Max. Tipps pro Tag</label><input class="input" id="s-max" type="number" min="1" max="30" step="1" inputmode="numeric" value="6"></div>
             <div class="field"><label for="s-from">Ab Datum</label><input class="input" id="s-from" type="date"></div>
           </div>
           <button class="btn" type="submit">Testlauf starten</button>
@@ -401,14 +398,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     <div class="settings">
       <div class="panel"><div class="panel-h"><h3>Tipp-Arten</h3><span class="muted" style="font-size:12.5px">für Vorschläge und Kombis</span></div><div id="set-markets"></div></div>
       <div class="panel"><div class="panel-h"><h3>Wettbewerbe</h3></div><div id="set-comps"></div></div>
-      <div class="panel"><div class="panel-h"><h3>Risiko &amp; Quoten</h3></div>
+      <div class="panel"><div class="panel-h"><h3>Risiko</h3></div>
         <div class="panel-b" style="display:grid;gap:14px">
           <div class="field"><span class="lbl">Risikoprofil für Vorschläge</span>
             <div class="seg" id="set-risk"><button type="button" data-v="vorsichtig">Vorsichtig</button><button type="button" data-v="ausgewogen">Ausgewogen</button><button type="button" data-v="mutig">Mutig</button></div>
             <span class="note" id="set-risk-note" style="margin:0"></span>
           </div>
-          <div class="field"><label for="set-disc">Sporttipp-Abschlag auf Marktquoten in %</label><input class="input" id="set-disc" type="number" min="0" max="20" step="1"></div>
-          <p class="note" style="margin:0">Sporttipp zahlt meist etwas weniger als der Marktschnitt. Der Abschlag rechnet die Marktquoten auf ungefähre Sporttipp-Quoten um. Die Einstellungen gelten nur auf diesem Gerät.</p>
+          <p class="note" style="margin:0">Quoten sind der Mittelwert der Buchmacher (The Odds API). Die Einstellungen gelten nur auf diesem Gerät.</p>
         </div>
       </div>
     </div>
@@ -476,13 +472,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (k[0] === "K") return `${k[1] === "O" ? "Über" : "Unter"} ${k.slice(2)} Karten`;
     return k;
   }
-  // Quote für einen Markt: Marktquote (mit Sporttipp-Abschlag) oder bei Kombis im Spiel keine
+  // Quote für einen Markt: Mittelwert der Buchmacher; Kombis im Spiel haben keine Marktquote
   function options(u) {
-    const S = settings, R = data.risk[S.risk], disc = S.disc / 100, out = [];
+    const S = settings, R = data.risk[S.risk], out = [];
     for (const [k, p] of Object.entries(u.m)) {
       if (!S.groups[groupOf(k)] || p <= 0.001) continue;
-      const mo = u.odds && u.odds[k];
-      const odds = mo ? mo * (1 - disc) : null;
+      const mo = u.known && u.odds && u.odds[k];
+      const odds = mo || null;
       const ev = odds ? p * odds - 1 : null;
       const fair = 1 / p;
       const q = odds || fair;
@@ -508,12 +504,12 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   function defaults() {
     const g = {}; GROUPS.forEach(([k, , , on]) => (g[k] = on));
     const c = {}; Object.keys(data.comps).forEach((k) => (c[k] = true));
-    return { groups: g, comps: c, risk: "ausgewogen", disc: Math.round((data.discount || 0.07) * 100) };
+    return { groups: g, comps: c, risk: "ausgewogen" };
   }
   function loadSettings() {
     const d = defaults(), s = store.get("go-settings") || {};
     settings = { groups: { ...d.groups, ...(s.groups || {}) }, comps: { ...d.comps, ...(s.comps || {}) },
-      risk: data.risk[s.risk] ? s.risk : d.risk, disc: Number.isFinite(s.disc) ? s.disc : d.disc };
+      risk: data.risk[s.risk] ? s.risk : d.risk };
   }
   const saveSettings = () => store.set("go-settings", settings);
 
@@ -587,7 +583,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       ? `<div class="best"><span class="what">${esc(label(pk.k, u))}</span><span class="meta">Chance ${pct(pk.p)} · ${quoteTxt(pk)}</span></div>${evTag(pk)}`
       : `<div class="best"><span class="meta">Kein Tipp im gewählten Risikobereich</span></div>`;
     return `<a class="card" href="#spiel-${esc(u.id)}">
-      <div class="card-head"><span class="comp-tag">${esc(compName(u.comp, true))}</span><span><b>${fTime.format(d)}</b>${u.neutral ? " · neutral" : ""}</span></div>
+      <div class="card-head"><span class="comp-tag">${esc(compName(u.comp, true))}${u.known ? "" : ` · <span title="Wenig Daten">unsicher</span>`}</span><span><b>${fTime.format(d)}</b>${u.neutral ? " · neutral" : ""}</span></div>
       <div class="fixture">
         <div class="teams">
           <div class="team">${crest(u.home)}<span class="tname">${esc(u.home.name)}</span></div>
@@ -606,7 +602,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   // Kombi-Vorschläge über mehrere Spiele (nächste 48 Stunden)
   function buildSlips() {
     const now = Date.now(), R = data.risk[settings.risk];
-    const soon = visibleMatches().filter((u) => { const t = new Date(u.kickoff).getTime(); return t > now && t < now + 48 * 3600e3; });
+    const soon = visibleMatches().filter((u) => { const t = new Date(u.kickoff).getTime(); return u.known && t > now && t < now + 48 * 3600e3; });
     const slips = [];
     // Sichere Kombi: pro Spiel der wahrscheinlichste Tipp mit fairer Quote 1.25–1.75
     const safeLegs = soon.map((u) => {
@@ -711,13 +707,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           <div class="stat"><dt>Beide treffen</dt><dd>${pct(u.m.BTTS)}</dd></div>
           ${extra.join("")}
         </dl>
-        ${u.known ? "" : `<p class="note" style="margin:0">Mindestens ein Team hat kaum Daten (z. B. Amateurklub im Pokal). Die Prognose ist unsicherer.</p>`}
+        ${u.known ? "" : `<p class="note" style="margin:0"><b>Unsichere Prognose.</b> Mindestens ein Team hat zu wenig Spiele in den Daten (z. B. Amateurklub im Pokal). Darum keine Value-Tipps und keine Kombi-Vorschläge mit diesem Spiel.</p>`}
       </div>
       <div class="detail-grid">
         <div style="display:grid;gap:16px;min-width:0">
           <div class="panel"><div class="panel-h"><h3>Beste Tipps</h3><span class="muted" style="font-size:12.5px">Quote ${R.min_odds}–${R.max_odds} · ${esc(settings.risk)}</span></div>${tipList(singles, u, 5)}</div>
           ${settings.groups.combo ? `<div class="panel"><div class="panel-h"><h3>Beste Kombis im Spiel</h3><span class="muted" style="font-size:12.5px">exakt berechnet, nicht einfach multipliziert</span></div>${tipList(combos, u, 4)}</div>` : ""}
-          <div class="panel"><div class="panel-h"><h3>Alle Märkte</h3><span class="muted" style="font-size:12.5px">${u.odds && Object.keys(u.odds).length ? "Quote = Markt − " + settings.disc + " %" : "noch keine Marktquoten"}</span></div>${groups || `<div class="panel-b muted">Alle Tipp-Arten sind in den Einstellungen ausgeschaltet.</div>`}</div>
+          <div class="panel"><div class="panel-h"><h3>Alle Märkte</h3><span class="muted" style="font-size:12.5px">${u.odds && Object.keys(u.odds).length ? "Quote = Mittelwert der Buchmacher" : "noch keine Marktquoten"}</span></div>${groups || `<div class="panel-b muted">Alle Tipp-Arten sind in den Einstellungen ausgeschaltet.</div>`}</div>
         </div>
         <div class="panel"><div class="panel-h"><h3>Resultate</h3></div><div class="panel-b">${heatmap(u)}</div></div>
       </div>`;
@@ -746,12 +742,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     toggleChips($("#s-leagues")); toggleChips($("#s-markets"));
     segInit($("#s-risk"), simState.risk || "ausgewogen", (v) => ($("#s-risk-note").textContent = riskNote(v)));
     $("#s-risk-note").textContent = riskNote(simState.risk || "ausgewogen");
-    const stakeLbl = { fix: ["CHF pro Tipp", 10, 1], percent: ["Prozent pro Tipp", 2, .5], kelly: ["Kelly-Anteil (0.1–1)", .25, .05] };
-    segInit($("#s-mode"), simState.mode || "percent", (v) => { $("#s-stake-l").textContent = stakeLbl[v][0]; $("#s-stake").value = stakeLbl[v][1]; $("#s-stake").step = stakeLbl[v][2]; });
+    const stakeLbl = { fix: ["CHF pro Tipp", 10], percent: ["Prozent vom Konto pro Tipp", 2], kelly: ["Kelly-Anteil (0.1 bis 1)", 0.25] };
+    segInit($("#s-mode"), simState.mode || "percent", (v) => { $("#s-stake-l").textContent = stakeLbl[v][0]; $("#s-stake").value = stakeLbl[v][1]; });
     $("#s-stake-l").textContent = stakeLbl[simState.mode || "percent"][0];
     segInit($("#s-legs"), String(simState.legs || 1));
-    ["budget", "disc", "stake", "max", "from"].forEach((k) => { if (simState[k] !== undefined) $("#s-" + k).value = simState[k]; });
-    if (!simState.disc) $("#s-disc").value = settings.disc;
+    ["budget", "stake", "max", "from"].forEach((k) => { if (simState[k] !== undefined) $("#s-" + k).value = simState[k]; });
     loadSim().then(() => {
       if (!sim || !sim.rows.length) { $("#sim-out").innerHTML = `<div class="panel"><div class="empty"><strong>Noch keine Rückblick-Daten</strong>Sie entstehen beim nächsten Lauf des Bots.</div></div>`; return; }
       const first = sim.rows[0][0], last = sim.rows[sim.rows.length - 1][0];
@@ -769,10 +764,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   function runSim() {
     if (!sim || !sim.rows.length) return;
-    const cfg = { budget: +$("#s-budget").value || 500, disc: (+$("#s-disc").value || 0) / 100, risk: segVal($("#s-risk")),
-      mode: segVal($("#s-mode")), stake: +$("#s-stake").value || 1, legs: +segVal($("#s-legs")), max: +$("#s-max").value || 6,
+    const num = (id, d) => { const v = parseFloat(String($(id).value).replace(",", ".")); return Number.isFinite(v) && v > 0 ? v : d; };
+    const cfg = { budget: num("#s-budget", 500), risk: segVal($("#s-risk")),
+      mode: segVal($("#s-mode")), stake: num("#s-stake", 1), legs: +segVal($("#s-legs")), max: Math.round(num("#s-max", 6)),
       from: $("#s-from").value, markets: onChips($("#s-markets")), leagues: onChips($("#s-leagues")) };
-    store.set("go-sim", { budget: cfg.budget, disc: cfg.disc * 100, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
+    store.set("go-sim", { budget: cfg.budget, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
     const R = data.risk[cfg.risk];
     // Zeile: [datum, liga, heim, gast, p1, pX, p2, pO, pU, o1, oX, o2, oO, oU, tore heim, tore gast]
     const byDay = new Map();
@@ -785,7 +781,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       let best = null;
       for (const c of cands) {
         if (!c.o) continue;
-        const odds = c.o * (1 - cfg.disc), ev = c.p * odds - 1;
+        const odds = c.o, ev = c.p * odds - 1;
         if (odds < R.min_odds || odds > R.max_odds || ev < R.min_ev) continue;
         if (!best || ev > best.ev) best = { ...c, odds, ev };
       }
@@ -815,7 +811,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     }
     const profit = bank - cfg.budget, roi = staked ? profit / staked : 0;
     const out = $("#sim-out");
-    if (!n) { out.innerHTML = `<div class="panel"><div class="empty"><strong>Keine Wetten</strong>Mit diesen Einstellungen fand der Testlauf keinen Tipp. Versuch ein anderes Risiko, mehr Märkte oder einen kleineren Abschlag.</div></div>`; return; }
+    if (!n) { out.innerHTML = `<div class="panel"><div class="empty"><strong>Keine Wetten</strong>Mit diesen Einstellungen fand der Testlauf keinen Tipp. Versuch ein anderes Risiko, mehr Märkte oder ein früheres Startdatum.</div></div>`; return; }
     out.innerHTML = `<dl class="kpis">
         <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Endkapital</dt><dd>${chf(bank)}<small>Start ${chf(cfg.budget)} CHF</small></dd></div>
         <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Gewinn</dt><dd>${profit >= 0 ? "+" : ""}${chf(profit)}<small>ROI ${sign(roi)} auf ${chf(staked)} Einsatz</small></dd></div>
@@ -826,7 +822,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <div class="panel"><div class="panel-h"><h3>Letzte Wetten</h3></div><div class="table-wrap"><table class="rank"><thead><tr><th>Datum</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>
         ${log.slice(-15).reverse().map((x) => `<tr><td class="muted">${fDate.format(new Date(x.day))}</td><td>${x.b.legs.map((l) => `${esc(l.match)} <b>${esc(l.k.replace("O2.5", "Ü2.5"))}</b>`).join("<br>")}</td><td class="num">${x.b.odds.toFixed(2)}</td><td class="num">${chf(x.s)}</td><td><span class="status ${x.pay ? "won" : "lost"}">${x.pay ? "+" + chf(x.pay - x.s) : "−" + chf(x.s)}</span></td></tr>`).join("")}
       </tbody></table></div></div>
-      <p class="note">Simuliert mit den damaligen Marktquoten minus ${Math.round(cfg.disc * 100)} % und Prognosen, die nur Daten vor der jeweiligen Spielwoche kannten. Vergangene Ergebnisse garantieren nichts für die Zukunft.</p>`;
+      <p class="note">Simuliert mit den damaligen Marktquoten (Buchmacher-Durchschnitt) und Prognosen, die nur Daten vor der jeweiligen Spielwoche kannten. Vergangene Ergebnisse garantieren nichts für die Zukunft.</p>`;
   }
   function chart(curve, start) {
     const W = 640, H = 220, P = { l: 52, r: 14, t: 12, b: 26 };
@@ -868,7 +864,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         ${paper.bets.length ? `<div class="table-wrap"><table class="rank"><thead><tr><th>Spiel</th><th>Partie</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>${[...open, ...done.slice().reverse()].slice(0, 60).map(row).join("")}</tbody></table></div>`
         : `<div class="empty"><strong>Noch keine Wetten</strong>Der Bot wettet nur, wenn Marktquoten vorliegen und ein Tipp genug Value hat. ${data.odds.key ? "" : "Dafür fehlt noch der Odds-API-Key."}</div>`}
       </div>
-      <p class="note">Virtuelles Geld. Der Bot setzt jeden Morgen auf Spiele der nächsten 24 Stunden, mit Marktquoten minus ${Math.round((data.discount || 0) * 100)} %. Die Regeln stehen in config.py (PAPER).</p>`;
+      <p class="note">Virtuelles Geld. Der Bot setzt jeden Morgen auf Spiele der nächsten 24 Stunden, zu den aktuellen Marktquoten. Die Regeln stehen in config.py (PAPER).</p>`;
   }
   $("#tl-sim").addEventListener("click", () => { tlMode = "sim"; $("#sim-pane").hidden = false; $("#paper-pane").hidden = true; $("#tl-sim").setAttribute("aria-pressed", "true"); $("#tl-paper").setAttribute("aria-pressed", "false"); });
   $("#tl-paper").addEventListener("click", () => { tlMode = "paper"; $("#sim-pane").hidden = true; $("#paper-pane").hidden = false; $("#tl-paper").setAttribute("aria-pressed", "true"); $("#tl-sim").setAttribute("aria-pressed", "false"); renderPaper(); });
@@ -927,12 +923,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#set-comps").innerHTML = Object.entries(data.comps).map(([k, c]) => sw("c-" + k.replace(/\./g, "-"), settings.comps[k], c.name, c.type === "nation" ? "Nationalteams" : "", `data-c="${k}"`)).join("");
     $$("#set-risk button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === settings.risk)));
     $("#set-risk-note").textContent = riskNote(settings.risk);
-    $("#set-disc").value = settings.disc;
   }
   $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); renderMatches(); });
   $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); });
   $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); });
-  $("#set-disc").addEventListener("change", () => { settings.disc = Math.max(0, Math.min(20, +$("#set-disc").value || 0)); saveSettings(); renderMatches(); });
 
   // ---------- Start ----------
   function render() {

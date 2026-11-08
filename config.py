@@ -63,8 +63,8 @@ ODDS_MIN_CREDITS = 25        # darunter keine Abfragen mehr bis zum nächsten Mo
 ODDS_DAYS_AHEAD = 3          # Quoten nur für Spiele der nächsten 3 Tage holen (spart Credits)
 
 HISTORY_START = (2024, 7)    # ab hier Resultate laden (Jahr, Monat)
+MIN_GAMES = 12               # so viele Spiele im letzten Jahr braucht ein Team für Value-Tipps
 DAYS_AHEAD = 7               # Tipps in der Web-App
-SPORTTIPP_DISCOUNT = 0.07    # Sporttipp-Quoten liegen grob 7 % unter dem Marktschnitt
 
 # Risikoprofile: Quotenbereich, Mindest-Value, Kelly-Anteil, max. Spiele pro Kombi
 RISK = {

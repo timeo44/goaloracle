@@ -136,7 +136,7 @@ def main():
     data = {
         "generated": now.isoformat(),
         "comps": {k: {"name": v[0], "short": v[1], "type": v[2]} for k, v in C.DISPLAY.items()},
-        "risk": C.RISK, "discount": C.SPORTTIPP_DISCOUNT, "days_ahead": C.DAYS_AHEAD,
+        "risk": C.RISK, "days_ahead": C.DAYS_AHEAD,
         "odds": {"key": bool(key), "credits": credits, "matches": sum(1 for u in upcoming if u["odds"])},
         "model": {"club_teams": len(models.club.teams), "club_matches": models.club.n_matches,
                   "home_adv": round(2.718281828 ** models.club.home_adv, 2),
