@@ -1277,7 +1277,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           </div>
           <div class="detail-grid">
             <div style="display:grid;gap:16px;min-width:0">
-              ${base.noTips ? `<div class="panel"><div class="panel-b muted">Für dieses Spiel hatte GoalOracle keine Tipps gespeichert.</div></div>` : ourTipsHtml(base, S)}
+              ${base.noTips ? `<div class="panel"><div class="panel-b muted">Für dieses Spiel gibt es noch keine Tipps. Sie werden beim nächsten Lauf des Modells nachträglich berechnet.</div></div>` : ourTipsHtml(base, S)}
               <div class="panel"><div class="panel-h"><h3>Spielverlauf</h3><span class="muted" style="font-size:12.5px">Symbole antippen für Details</span></div>
                 <div class="panel-b">${S ? `<div class="tl-tools" role="group" aria-label="Anzeigen">
                     <button type="button" class="chip" data-tl="corner" aria-pressed="${tlShow.corner !== false}">${iconSvg("corner", 14)} Eckbälle</button>

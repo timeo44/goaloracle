@@ -118,7 +118,6 @@ def main():
     ap.add_argument("--retune", action="store_true", help="Modell-Einstellungen neu optimieren (dauert einige Minuten)")
     ap.add_argument("--dry-run", action="store_true", help="Telegram-Text nur anzeigen")
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
-    ap.add_argument("--backfill", action="store_true", help="Nachträgliche Tipps für die laufende Saison ergänzen")
     args = ap.parse_args()
 
     now = datetime.now(timezone.utc)
@@ -166,16 +165,18 @@ def main():
 
     upcoming = E.build_upcoming(pr, events, info, form, odds, now)
     prev_hist = load_json(WEB / "history.json", {}).get("history") or prev.get("history", [])
-    # Einmal pro Saison: nachträgliche Tipps für bereits gespielte Partien eintragen
-    bf_f = ROOT / "cache" / "backfill.json"
-    bf = load_json(bf_f, {})
+    rankings = E.build_rankings(pr, events, info, form, now)
+    # Nachträgliche Tipps: alle gespielten Partien der 15 Wettbewerbe seit Saisonstart und
+    # jedes Spiel, das in der App irgendwo antippbar ist (Form der angezeigten Teams).
+    # Neue Lücken werden bei jedem Lauf automatisch gefüllt.
+    shown = {u[s]["id"] for u in upcoming for s in ("home", "away")} | \
+            {r["team"]["id"] for rows in rankings.values() for r in rows}
+    form_ids = {x[8] for t in shown for x in fdet.get(t, [])}
     season_start = datetime(season, 7, 1, tzinfo=timezone.utc)
-    if args.backfill or bf.get("season") != season:
-        prev_hist = E.backfill_history(prev_hist, events, params, info, now, season_start)
-        write_json(bf_f, {"season": season, "done": now.isoformat()})
+    prev_hist = E.backfill_history(prev_hist, events, params, info, now, season_start,
+                                   extra_ids=form_ids, extra_since=now - timedelta(days=400))
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
-    rankings = E.build_rankings(pr, events, info, form, now)
 
     slugs_with_data = {e["slug"] for e in events if e["completed"]}
     data = {
@@ -200,8 +201,6 @@ def main():
         "history_summary": E.history_summary(history),
         "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
-    shown = {u[s]["id"] for u in upcoming for s in ("home", "away")} | \
-            {r["team"]["id"] for rows in rankings.values() for r in rows}
     data["forms"] = {t: fdet[t] for t in shown if t in fdet}
     data["ratings"] = E.team_ratings(pr, rankings, shown, events, now)
     opp = {x[1] for t in data["forms"] for x in data["forms"][t]}

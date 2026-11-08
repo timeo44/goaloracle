@@ -199,13 +199,26 @@ def update_history(prev: list[dict], upcoming: list[dict], events_by_id: dict, n
 
 
 def backfill_history(history: list[dict], events: list[dict], params: Params, info: dict, now: datetime,
-                     since: datetime, log=print) -> list[dict]:
+                     since: datetime, extra_ids: set | None = None, extra_since: datetime | None = None,
+                     log=print) -> list[dict]:
     """Nachträgliche Tipps für bereits gespielte Partien: pro Spielwoche nur mit Daten davor trainiert,
     mit den damaligen Quoten (falls vorhanden). Einträge bekommen retro=True."""
     have = {h["id"] for h in history}
-    todo = [e for e in events if e["slug"] in C.DISPLAY and e["completed"] and e["hs"] is not None
-            and e["id"] not in have and since <= parse_date(e["date"]) < now - timedelta(hours=3)
-            and e["home"]["id"] in info and e["away"]["id"] in info]
+    extra_ids = extra_ids or set()
+    extra_since = extra_since or since
+
+    def wanted(e):
+        d = parse_date(e["date"])
+        if d >= now - timedelta(hours=3):
+            return False
+        if e["slug"] in C.DISPLAY and d >= since:
+            return True
+        return e["id"] in extra_ids and d >= extra_since
+
+    todo = [e for e in events if e["completed"] and e["hs"] is not None and e["id"] not in have
+            and e["home"]["id"] in info and e["away"]["id"] in info and wanted(e)]
+    if not todo:
+        return history
     weeks = defaultdict(list)
     for e in todo:
         d = parse_date(e["date"])
