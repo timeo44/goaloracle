@@ -762,6 +762,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     let id = t.id;
     if (!id && t.logo) { const m = t.logo.match(/\/(\d+)\.png/); if (m) id = m[1]; }
     if (id && CRESTS.has(String(id))) return `crests/${id}.webp`;
+    // Gibt es eine lokale Wappen-Liste, hat ESPN für dieses Team kein Bild: direkt Kürzel zeigen
+    if (CRESTS.size) return "";
     return (t.logo || "").replace(/^http:/, "https:");
   }
   function crest(t, cls = "") {
