@@ -131,6 +131,21 @@ h2.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .chip small { font-weight: 500; opacity: .75; margin-left: 4px; }
 
+/* ---------- Tipps-Tab ---------- */
+.tipbar { display: grid; gap: 10px; }
+@media (min-width: 760px) { .tipbar { grid-template-columns: auto 1fr; align-items: center; } .tipbar #tp-legs { grid-column: 1 / -1; } }
+.picks { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.pick { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; text-decoration: none; color: inherit; min-width: 0; }
+.pick:hover { border-color: var(--muted); }
+.pick-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.pick-top .what { font-weight: 700; font-size: 16px; }
+.pick-top .chance { font: 700 24px/1 var(--font-display); text-align: right; }
+.pick-top .chance small { display: block; font: 500 11px/1.4 var(--font-body); color: var(--muted); }
+.pick-match { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-width: 0; }
+.pick-match span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.pick-foot .q { font: 700 15px/1 var(--font-display); color: var(--ink); }
+
 /* ---------- Kombi-Vorschläge ---------- */
 .slips { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); margin: 14px 0 6px; }
 .slip { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; }
@@ -385,6 +400,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     <nav class="tabs" role="tablist" aria-label="Bereiche">
       <button class="tab" role="tab" data-view="spiele" aria-selected="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Spiele</button>
+      <button class="tab" role="tab" data-view="tipps" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z"/><path d="M14 5v12" stroke-dasharray="2 2"/></svg>Tipps</button>
       <button class="tab" role="tab" data-view="testlauf" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Testlauf</button>
       <button class="tab" role="tab" data-view="ranking" aria-selected="false">
@@ -408,6 +425,25 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-spiel" hidden></section>
+
+  <section class="view" id="view-tipps" hidden>
+    <div class="tipbar">
+      <div class="seg" id="tp-kind" style="max-width:360px"><button type="button" data-v="single" aria-pressed="true">Einzelwetten</button><button type="button" data-v="combo" aria-pressed="false">Kombis</button></div>
+      <div class="chips" id="tp-when" role="group" aria-label="Zeitraum" style="margin:0">
+        <button type="button" class="chip" data-v="24" aria-pressed="false">24 Stunden</button>
+        <button type="button" class="chip" data-v="48" aria-pressed="true">48 Stunden</button>
+        <button type="button" class="chip" data-v="168" aria-pressed="false">7 Tage</button>
+      </div>
+      <div class="chips" id="tp-legs" role="group" aria-label="Spiele pro Kombi" style="margin:0" hidden>
+        <button type="button" class="chip" data-v="2" aria-pressed="true">2er</button>
+        <button type="button" class="chip" data-v="3" aria-pressed="false">3er</button>
+        <button type="button" class="chip" data-v="4" aria-pressed="false">4er</button>
+        <button type="button" class="chip" data-v="5" aria-pressed="false">5er</button>
+      </div>
+    </div>
+    <p class="note" id="tp-note" style="margin:10px 0 0"></p>
+    <div id="tp-out" style="margin-top:14px"></div>
+  </section>
 
   <section class="view" id="view-testlauf" hidden>
     <div class="chips" role="group" aria-label="Testlauf-Art">
@@ -642,7 +678,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const quoteTxt = (o) => o.odds ? `Quote ${o.odds.toFixed(2)}` : `faire Quote ${o.fair.toFixed(2)}`;
 
   // ---------- Navigation ----------
-  const VIEWS = ["spiele", "spiel", "testlauf", "ranking", "bilanz", "einstellungen"];
+  const VIEWS = ["spiele", "spiel", "tipps", "testlauf", "ranking", "bilanz", "einstellungen"];
   let lastList = "spiele";
   function route() {
     const h = location.hash.slice(1);
@@ -653,6 +689,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
     if (v === "testlauf") ensureSim();
+    if (v === "tipps") renderTipps();
     if (v !== "spiel" && v !== "einstellungen") lastList = v;
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.view; window.scrollTo(0, 0); }));
@@ -731,7 +768,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       p *= o.p; if (o.odds) q *= o.odds; else allOdds = false;
       return `<a class="leg" href="#spiel-${esc(u.id)}" style="color:inherit;text-decoration:none">${crest(u.home, "sm")}<span><span class="what">${esc(label(o.k, u))}</span><br><span class="where">${esc(u.home.name)} – ${esc(u.away.name)} · ${fShort.format(new Date(u.kickoff))} ${fTime.format(new Date(u.kickoff))}</span></span><span>${pct(o.p)}</span></a>`;
     }).join("");
-    const quote = allOdds ? `Quote <b>${q.toFixed(2)}</b>` : `faire Quote <b>${(1 / p).toFixed(2)}</b>`;
+    const quote = allOdds ? `Quote <b>${q.toFixed(2)}</b>${p * q - 1 > 0 ? ` <span class="ev pos">Value ${sign(p * q - 1)}</span>` : ""}` : `faire Quote <b>${(1 / p).toFixed(2)}</b>`;
     return `<div class="slip"><div class="slip-head"><strong>${esc(s.title)}</strong><span class="muted" style="font-size:12.5px">${esc(s.sub)}</span></div>${legs}
       <div class="slip-foot"><span>Gesamtchance <b>${pct(p)}</b></span><span>${quote}</span></div></div>`;
   }
@@ -750,6 +787,74 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     let out = "";
     days.forEach((l) => { out += `<section class="day"><h2 class="sec">${esc(fDay.format(new Date(l[0].kickoff)))}</h2><div class="grid">${l.map(card).join("")}</div></section>`; });
     $("#matches").innerHTML = out;
+  }
+
+  // ---------- Tipps-Tab ----------
+  const tp = Object.assign({ kind: "single", hours: 48, legs: 2 }, store.get("go-tp") || {});
+  function tpSync() {
+    $$("#tp-kind button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === tp.kind)));
+    $$("#tp-when .chip").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === tp.hours)));
+    $$("#tp-legs .chip").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === tp.legs)));
+    $("#tp-legs").hidden = tp.kind !== "combo";
+  }
+  const tpSet = (k, v) => { tp[k] = v; store.set("go-tp", tp); renderTipps(); };
+  $("#tp-kind").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) tpSet("kind", b.dataset.v); });
+  $("#tp-when").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("hours", +b.dataset.v); });
+  $("#tp-legs").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("legs", +b.dataset.v); });
+
+  function tipCandidates() {
+    const now = Date.now(), end = now + tp.hours * 3600e3;
+    const games = visibleMatches().filter((u) => { const t = new Date(u.kickoff).getTime(); return u.known && t > now && t <= end; });
+    return games.map((u) => ({ u, opts: rankOptions(options(u).filter((o) => groupOf(o.k) !== "combo")) })).filter((x) => x.opts.length);
+  }
+  function pickCard(u, o) {
+    const d = new Date(u.kickoff);
+    return `<a class="pick" href="#spiel-${esc(u.id)}">
+      <div class="pick-top"><span class="what">${esc(label(o.k, u))}</span><span class="chance">${pct(o.p)}<small>Chance</small></span></div>
+      <div class="pick-match">${crest(u.home, "sm")}${crest(u.away, "sm")}<span>${esc(u.home.name)} – ${esc(u.away.name)}</span></div>
+      <div class="pick-foot"><span class="q">${o.odds ? o.odds.toFixed(2) : o.fair.toFixed(2)}</span><span>${o.odds ? "Quote" : "faire Quote"}</span>${evTag(o)}<span>· ${esc(compName(u.comp, true))} · ${esc(fShort.format(d))} ${fTime.format(d)}</span></div>
+    </a>`;
+  }
+  function comboSets(cands, L) {
+    // je Spiel nur der beste Tipp, dann verschiedene Mischungen bauen
+    const legs = cands.map(({ u, opts }) => ({ u, o: opts[0] }));
+    const out = [], used = new Set();
+    const addSet = (title, sub, arr) => {
+      if (arr.length < L) return;
+      const set = arr.slice(0, L), key = set.map((l) => l.u.id + l.o.k).sort().join("|");
+      if (used.has(key)) return; used.add(key); out.push({ title, sub, legs: set });
+    };
+    const byP = legs.slice().sort((a, b) => b.o.p - a.o.p);
+    addSet("Sicherste Kombi", "die wahrscheinlichsten Tipps", byP);
+    const withVal = legs.filter((l) => l.o.value).sort((a, b) => b.o.ev - a.o.ev);
+    addSet("Value-Kombi", "Quoten höher als Modell-Chance", withVal);
+    const mid = legs.filter((l) => { const q = l.o.odds || l.o.fair; return q >= 1.5 && q <= 2.3; }).sort((a, b) => b.o.p - a.o.p);
+    addSet("Ausgewogene Kombi", "Quoten 1.5 bis 2.3 pro Tipp", mid);
+    for (let i = L, n = 2; i + L <= byP.length && out.length < 6; i += L, n++) addSet(`Alternative ${n - 1}`, "weitere sichere Tipps, andere Spiele", byP.slice(i));
+    // zweitbester Tipp pro Spiel als Variante
+    const alt = cands.filter((c) => c.opts[1]).map(({ u, opts }) => ({ u, o: opts[1] })).sort((a, b) => b.o.p - a.o.p);
+    addSet("Variante", "zweitbester Tipp pro Spiel", alt);
+    return out;
+  }
+  function renderTipps() {
+    tpSync();
+    const R = data.risk[settings.risk];
+    $("#tp-note").innerHTML = `Risiko <b>${esc(settings.risk)}</b> (Quoten ${R.min_odds}–${R.max_odds}) und deine Tipp-Arten aus den <a href="#einstellungen" style="color:inherit">Einstellungen</a>. Spiele mit unsicherer Prognose sind ausgeschlossen.`;
+    const cands = tipCandidates();
+    const out = $("#tp-out");
+    if (!cands.length) { out.innerHTML = `<div class="empty"><strong>Keine Tipps</strong>Im gewählten Zeitraum gibt es keine passenden Spiele. Wähl einen längeren Zeitraum oder ein anderes Risiko.</div>`; return; }
+    if (tp.kind === "single") {
+      const all = [];
+      cands.forEach(({ u, opts }) => opts.slice(0, 2).forEach((o, i) => all.push({ u, o, i })));
+      all.sort((a, b) => (b.o.value - a.o.value) || (a.i - b.i) || ((b.o.ev ?? -9) - (a.o.ev ?? -9)) || (b.o.p - a.o.p));
+      const val = all.filter((x) => x.o.value).length;
+      out.innerHTML = `<h2 class="sec">${all.length} Einzeltipps aus ${cands.length} Spielen${val ? ` · ${val} mit Value` : ""}</h2><div class="picks">${all.slice(0, 60).map((x) => pickCard(x.u, x.o)).join("")}</div>`;
+      return;
+    }
+    const sets = comboSets(cands, tp.legs);
+    if (!sets.length) { out.innerHTML = `<div class="empty"><strong>Zu wenige Spiele</strong>Für eine ${tp.legs}er-Kombi braucht es ${tp.legs} verschiedene Spiele im Zeitraum. Wähl einen längeren Zeitraum oder weniger Spiele pro Kombi.</div>`; return; }
+    out.innerHTML = `<h2 class="sec">${sets.length} Vorschläge · ${tp.legs} Spiele pro Kombi</h2><div class="slips">${sets.map(slipHtml).join("")}</div>
+      <p class="note">Die Gesamtchance ist das Produkt der Einzelchancen. Je mehr Spiele, desto höher die Quote, aber desto seltener geht die Kombi auf.</p>`;
   }
 
   // ---------- Spiel-Detail ----------
@@ -1274,9 +1379,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $$("#set-risk button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === settings.risk)));
     $("#set-risk-note").textContent = riskNote(settings.risk);
   }
-  $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); renderMatches(); });
-  $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); });
-  $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); });
+  $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); renderMatches(); renderTipps(); });
+  $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); renderTipps(); });
+  $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); renderTipps(); });
 
   // ---------- Info-Blasen (Hover am Computer, Antippen am Handy) ----------
   const tipbox = document.createElement("div");
@@ -1326,7 +1431,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (!data.odds.key) notes.push("<b>Noch ohne Marktquoten.</b> Tipps werden nach Wahrscheinlichkeit sortiert. Mit einem Odds-API-Key erkennt GoalOracle auch Value.");
     $("#notice").innerHTML = notes.join(" "); $("#notice").hidden = !notes.length;
     $("#model-note").textContent = `Modell: Dixon-Coles über ${data.model.club_teams} Clubs und ${data.model.club_matches.toLocaleString("de-CH")} Spiele, Heimvorteil ${data.model.home_adv.toFixed(2)}×. Wappen und Spielpläne: ESPN. Quoten: The Odds API, historisch football-data.co.uk.`;
-    renderMatches(); renderRanking(); renderBilanz(); renderSettings();
+    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps();
     route();
   }
   function fail() {
