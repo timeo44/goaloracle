@@ -376,6 +376,7 @@ a.team-link:hover .tname { text-decoration: underline; text-underline-offset: 3p
 .team-hero { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 16px; }
 .team-hero h2 { margin: 0; font: 700 30px/1.05 var(--font-display); text-transform: uppercase; letter-spacing: .02em; text-wrap: balance; }
 .team-hero .sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+.retro-tag { font: 600 10.5px/1 var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px dashed var(--line); border-radius: 3px; padding: 2px 4px; margin-left: 4px; white-space: nowrap; }
 .res { font: 700 12px/1 var(--font-display); padding: 4px 6px; border-radius: 3px; color: var(--surface); }
 .res.S { background: var(--good); } .res.U { background: var(--draw); } .res.N { background: var(--bad); }
 
@@ -529,8 +530,16 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-bilanz" hidden>
+    <div class="chips" id="bl-kind" role="group" aria-label="Art der Tipps">
+      <button type="button" class="chip" data-v="all" aria-pressed="true">Alle</button>
+      <button type="button" class="chip" data-v="live" aria-pressed="false">Live getippt</button>
+      <button type="button" class="chip" data-v="retro" aria-pressed="false">Nachträglich</button>
+    </div>
+    <div class="chips" id="bl-comp" role="group" aria-label="Wettbewerb"></div>
+    <p class="note" id="bl-note" style="margin:0 0 12px"></p>
     <dl class="kpis" id="kpis"></dl>
     <div class="panel table-wrap" style="margin-top:14px"><table class="rank" id="log"></table></div>
+    <button type="button" class="chip" id="bl-more" style="margin:12px auto 0;display:block" hidden>Mehr anzeigen</button>
   </section>
 
   <section class="view" id="view-einstellungen" hidden>
@@ -1230,7 +1239,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const combos = base.combos || [];
     const scoreHit = finished && !et ? (base.score[0] === hg && base.score[1] === ag) : null;
     const tipHit = finished && !et ? hitOf(base.tip, hg, ag) : null;
-    return `<div class="panel"><div class="panel-h"><h3>Unsere Tipps</h3><span class="muted" style="font-size:12.5px">Stand vor Anpfiff</span></div>
+    return `<div class="panel"><div class="panel-h"><h3>Unsere Tipps</h3><span class="muted" style="font-size:12.5px">${base.retro ? "nachträglich berechnet, nur mit Daten vor der Spielwoche" : "Stand vor Anpfiff"}</span></div>
       <div class="verdict">
         <div><span class="lbl">Tipp 1X2</span><b>${esc(base.tip)}</b><br>${tipHit === null ? "" : `<span class="status ${tipHit ? "won" : "lost"}">${tipHit ? "✓" : "✗"}</span>`}</div>
         <div><span class="lbl">Resultat-Tipp</span><b>${base.score[0]}:${base.score[1]}</b><br>${scoreHit === null ? "" : `<span class="status ${scoreHit ? "exact" : "lost"}">${scoreHit ? "Exakt" : "✗"}</span>`}</div>
@@ -1501,20 +1510,39 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   $("#rank-chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; rankComp = b.dataset.c; renderRanking(); });
 
   // ---------- Bilanz ----------
+  const bl = Object.assign({ kind: "all", comp: "all" }, store.get("go-bl") || {});
+  let blShown = 100;
   function renderBilanz() {
-    const S = data.history_summary || { done: 0, open: 0, hits_1x2: 0, exact: 0, picks: 0, pick_hits: 0 };
-    const rate = (a, b) => (b ? pct(a / b) : "–");
-    $("#kpis").innerHTML = `
-      <div class="kpi"><dt data-tip="Wie oft der Tipp, den die App pro Spiel als besten zeigt, gestimmt hat.">Bester Tipp richtig</dt><dd>${rate(S.pick_hits, S.picks)}<small>${S.pick_hits} von ${S.picks}</small></dd></div>
-      <div class="kpi"><dt data-tip="Wie oft der wahrscheinlichste Ausgang (Heimsieg, Remis, Auswärtssieg) eingetreten ist.">1X2 richtig</dt><dd>${rate(S.hits_1x2, S.done)}<small>${S.hits_1x2} von ${S.done}</small></dd></div>
-      <div class="kpi"><dt data-tip="Wie oft der Resultat-Tipp genau gestimmt hat.">Resultat exakt</dt><dd>${rate(S.exact, S.done)}<small>${S.exact} von ${S.done}</small></dd></div>
-      <div class="kpi"><dt>Offen</dt><dd>${S.open}<small>nach Abpfiff ausgewertet</small></dd></div>`;
+    const S = data.history_summary || {};
+    const rate = (x, y) => (y ? pct(x / y) : "–");
+    const kpis = (s) => {
+      $("#kpis").innerHTML = `
+        <div class="kpi"><dt data-tip="Wie oft der Tipp, den die App pro Spiel als besten zeigt, gestimmt hat.">Bester Tipp richtig</dt><dd>${rate(s.pick_hits, s.picks)}<small>${s.pick_hits || 0} von ${s.picks || 0}</small></dd></div>
+        <div class="kpi"><dt data-tip="Wie oft der wahrscheinlichste Ausgang (Heimsieg, Remis, Auswärtssieg) eingetreten ist.">1X2 richtig</dt><dd>${rate(s.hits_1x2, s.done)}<small>${s.hits_1x2 || 0} von ${s.done || 0}</small></dd></div>
+        <div class="kpi"><dt data-tip="Wie oft der Resultat-Tipp genau gestimmt hat.">Resultat exakt</dt><dd>${rate(s.exact, s.done)}<small>${s.exact || 0} von ${s.done || 0}</small></dd></div>
+        <div class="kpi"><dt data-tip="Alle gespeicherten Einzeltipps (bis 5 pro Spiel) und wie viele davon richtig waren.">Alle Einzeltipps</dt><dd>${rate(s.tip_hits, s.tips)}<small>${s.tip_hits || 0} von ${s.tips || 0}</small></dd></div>`;
+    };
+    kpis(S);
     $("#log").innerHTML = `<tbody><tr><td><div class="empty">Bilanz wird geladen …</div></td></tr></tbody>`;
     loadHistory().then((hist) => {
-      if (!hist.length) { $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Noch keine Bilanz</strong>Sobald getippte Spiele gespielt sind, steht hier, ob die Tipps gestimmt haben.</div></td></tr></tbody>`; return; }
-      const out = (a, b) => (a > b ? "1" : a === b ? "X" : "2");
-      const now = Date.now();
-      const rows = hist.filter((h) => new Date(h.kickoff).getTime() <= now + 3600e3).slice(0, 250);
+      $$("#bl-kind .chip").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === bl.kind)));
+      const comps = [...new Set(hist.map((h) => h.comp))].filter((c) => data.comps[c]);
+      if (bl.comp !== "all" && !comps.includes(bl.comp)) bl.comp = "all";
+      $("#bl-comp").innerHTML = `<button type="button" class="chip" data-v="all" aria-pressed="${bl.comp === "all"}">Alle Wettbewerbe</button>` +
+        Object.keys(data.comps).filter((c) => comps.includes(c)).map((c) => `<button type="button" class="chip" data-v="${c}" aria-pressed="${bl.comp === c}">${esc(compName(c, true))}</button>`).join("");
+      const now = Date.now(), out = (a, b) => (a > b ? "1" : a === b ? "X" : "2");
+      const list = hist.filter((h) => new Date(h.kickoff).getTime() <= now + 3600e3
+        && (bl.kind === "all" || (bl.kind === "retro" ? h.retro : !h.retro)) && (bl.comp === "all" || h.comp === bl.comp));
+      const done = list.filter((h) => Array.isArray(h.result));
+      const picks = done.filter((h) => h.pick && typeof h.pick.hit === "boolean");
+      const tips = done.flatMap((h) => (h.tips || []).filter((t) => typeof t.hit === "boolean"));
+      kpis({ done: done.length, hits_1x2: done.filter((h) => h.tip === out(h.result[0], h.result[1])).length,
+        exact: done.filter((h) => h.score[0] === h.result[0] && h.score[1] === h.result[1]).length,
+        picks: picks.length, pick_hits: picks.filter((h) => h.pick.hit).length, tips: tips.length, tip_hits: tips.filter((t) => t.hit).length });
+      const nRetro = hist.filter((h) => h.retro).length;
+      $("#bl-note").textContent = nRetro ? `«Nachträglich» heisst: Diese Tipps wurden im Nachhinein berechnet, jeweils nur mit Daten, die vor der Spielwoche bekannt waren, und den damaligen Quoten. Alles ab heute wird live vor dem Anpfiff gespeichert.` : "";
+      if (!list.length) { $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Keine Einträge</strong>Für diesen Filter gibt es noch keine Tipps.</div></td></tr></tbody>`; $("#bl-more").hidden = true; return; }
+      const rows = list.slice(0, blShown);
       $("#log").innerHTML = `<thead><tr><th class="hide-sm">Datum</th><th>Spiel</th><th>Bester Tipp</th><th class="num">Tipp</th><th class="num">Ergebnis</th></tr></thead><tbody>${rows.map((h) => {
         let res = new Date(h.kickoff).getTime() > now ? `<span class="muted">bald</span>` : `<span class="muted">offen</span>`, st = "";
         if (Array.isArray(h.result)) {
@@ -1523,11 +1551,16 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           st = ex ? `<span class="status exact">Exakt</span>` : ok ? `<span class="status won">1X2 ✓</span>` : `<span class="status lost">1X2 ✗</span>`;
         } else if (h.result === "et" || h.result === "void") res = `<span class="muted">${h.result === "et" ? "Verlängerung" : "abgesagt"}</span>`;
         const pk = h.pick ? `${esc(label(h.pick.key, h))} ${typeof h.pick.hit === "boolean" ? `<span class="status ${h.pick.hit ? "won" : "lost"}">${h.pick.hit ? "✓" : "✗"}</span>` : ""}` : "–";
-        return `<tr data-href="#spiel-${esc(h.id)}" tabindex="0"><td class="hide-sm muted">${esc(fShort.format(new Date(h.kickoff)))}</td>
+        return `<tr data-href="#spiel-${esc(h.id)}" tabindex="0"><td class="hide-sm muted">${esc(fShort.format(new Date(h.kickoff)))}${h.retro ? `<br><span class="retro-tag">nachträglich</span>` : ""}</td>
           <td><span class="t">${crest(h.home, "sm")}${crest(h.away, "sm")}<span class="hide-sm">${esc(h.home.name)} – ${esc(h.away.name)}</span></span></td>
           <td style="white-space:normal">${pk}</td><td class="num">${h.tip} <span class="muted">${h.score[0]}:${h.score[1]}</span></td><td class="num">${res} ${st}</td></tr>`; }).join("")}</tbody>`;
+      $("#bl-more").hidden = list.length <= blShown;
+      $("#bl-more").textContent = `Mehr anzeigen (${list.length - blShown} weitere)`;
     });
   }
+  $("#bl-kind").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; bl.kind = b.dataset.v; blShown = 100; store.set("go-bl", bl); renderBilanz(); });
+  $("#bl-comp").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; bl.comp = b.dataset.v; blShown = 100; store.set("go-bl", bl); renderBilanz(); });
+  $("#bl-more").addEventListener("click", () => { blShown += 150; renderBilanz(); });
   $("#log").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href.slice(1); });
   $("#log").addEventListener("keydown", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr && e.key === "Enter") location.hash = tr.dataset.href.slice(1); });
 

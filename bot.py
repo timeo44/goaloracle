@@ -118,6 +118,7 @@ def main():
     ap.add_argument("--retune", action="store_true", help="Modell-Einstellungen neu optimieren (dauert einige Minuten)")
     ap.add_argument("--dry-run", action="store_true", help="Telegram-Text nur anzeigen")
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
+    ap.add_argument("--backfill", action="store_true", help="Nachträgliche Tipps für die laufende Saison ergänzen")
     args = ap.parse_args()
 
     now = datetime.now(timezone.utc)
@@ -165,6 +166,13 @@ def main():
 
     upcoming = E.build_upcoming(pr, events, info, form, odds, now)
     prev_hist = load_json(WEB / "history.json", {}).get("history") or prev.get("history", [])
+    # Einmal pro Saison: nachträgliche Tipps für bereits gespielte Partien eintragen
+    bf_f = ROOT / "cache" / "backfill.json"
+    bf = load_json(bf_f, {})
+    season_start = datetime(season, 7, 1, tzinfo=timezone.utc)
+    if args.backfill or bf.get("season") != season:
+        prev_hist = E.backfill_history(prev_hist, events, params, info, now, season_start)
+        write_json(bf_f, {"season": season, "done": now.isoformat()})
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
     rankings = E.build_rankings(pr, events, info, form, now)

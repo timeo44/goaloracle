@@ -195,18 +195,62 @@ def update_history(prev: list[dict], upcoming: list[dict], events_by_id: dict, n
     keep = [h for h in hist.values()
             if h.get("result") is not None or parse_date(h["kickoff"]) > now - timedelta(days=4)]
     keep.sort(key=lambda h: h["kickoff"], reverse=True)
-    return keep[:1200]
+    return keep[:4000]
+
+
+def backfill_history(history: list[dict], events: list[dict], params: Params, info: dict, now: datetime,
+                     since: datetime, log=print) -> list[dict]:
+    """Nachträgliche Tipps für bereits gespielte Partien: pro Spielwoche nur mit Daten davor trainiert,
+    mit den damaligen Quoten (falls vorhanden). Einträge bekommen retro=True."""
+    have = {h["id"] for h in history}
+    todo = [e for e in events if e["slug"] in C.DISPLAY and e["completed"] and e["hs"] is not None
+            and e["id"] not in have and since <= parse_date(e["date"]) < now - timedelta(hours=3)
+            and e["home"]["id"] in info and e["away"]["id"] in info]
+    weeks = defaultdict(list)
+    for e in todo:
+        d = parse_date(e["date"])
+        weeks[(d - timedelta(days=d.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)].append(e)
+    warm, added = None, []
+    for monday in sorted(weeks):
+        try:
+            pr = Predictor(params).fit(events, monday, warm=warm)
+        except ValueError:
+            continue
+        warm = pr
+        for e in weeks[monday]:
+            fd = e.get("fd") or {}
+            odds = {k: fd[f] for k, f in (("1", "o1"), ("X", "oX"), ("2", "o2"), ("O2.5", "oO25"), ("U2.5", "oU25"))
+                    if fd.get(f)}
+            res = pr.predict(e, odds)
+            if not res:
+                continue
+            p = res["pred"]
+            mk = all_markets(p.matrix, res["corners"], res["cards"])
+            use_odds = odds if res["known"] else {}
+            hs, as_, _ = p.best_score()
+            entry = {"id": e["id"], "kickoff": parse_date(e["date"]).isoformat(), "comp": e["slug"], "retro": True,
+                     "home": {k: info[e["home"]["id"]].get(k, "") for k in ("id", "name", "tla", "logo")},
+                     "away": {k: info[e["away"]["id"]].get(k, "") for k in ("id", "name", "tla", "logo")},
+                     "p": [r(p.p_home, 3), r(p.p_draw, 3), r(p.p_away, 3)], "tip": p.tip, "score": [hs, as_],
+                     "xg": [r(p.xg_home, 2), r(p.xg_away, 2)], "pick": pick_best(mk, use_odds), "result": None}
+            entry["tips"], entry["combos"] = top_options(mk, use_odds)
+            added.append(entry)
+    log(f"Nachträgliche Tipps: {len(added)} Spiele in {len(weeks)} Wochen")
+    return history + added
 
 
 def history_summary(history: list[dict]) -> dict:
-    """Kurzfassung der Bilanz für den Start der App."""
+    """Kurzfassung der Bilanz für den Start der App (live getippt und nachträglich zusammen)."""
     done = [h for h in history if isinstance(h.get("result"), list)]
     out = lambda a, b: "1" if a > b else "X" if a == b else "2"
     picks = [h for h in done if h.get("pick") and isinstance(h["pick"].get("hit"), bool)]
     return {"done": len(done), "open": sum(1 for h in history if h.get("result") is None),
             "hits_1x2": sum(1 for h in done if h["tip"] == out(*h["result"])),
             "exact": sum(1 for h in done if h["score"] == h["result"]),
-            "picks": len(picks), "pick_hits": sum(1 for h in picks if h["pick"]["hit"])}
+            "picks": len(picks), "pick_hits": sum(1 for h in picks if h["pick"]["hit"]),
+            "tips": sum(1 for h in done for t in h.get("tips", []) if isinstance(t.get("hit"), bool)),
+            "tip_hits": sum(1 for h in done for t in h.get("tips", []) if t.get("hit") is True),
+            "retro": sum(1 for h in history if h.get("retro"))}
 
 
 # ---------------- Rückblick (Simulation mit historischen Quoten) ----------------
