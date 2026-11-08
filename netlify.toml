@@ -1,8 +1,0 @@
-[build]
-  publish = "web"
-  command = ""
-
-[[headers]]
-  for = "/data.json"
-  [headers.values]
-    Cache-Control = "no-cache"

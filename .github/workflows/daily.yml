@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write   # damit der Bot web/data.json speichern darf
+  pages: write      # damit die Web-App veröffentlicht werden darf
+  id-token: write
 
 concurrency:
   group: goaloracle
@@ -22,6 +24,9 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -54,3 +59,18 @@ jobs:
           git add web/data.json
           git diff --cached --quiet || git commit -m "Tipps vom $(date -u +%d.%m.%Y)"
           git push
+
+      - name: Web-App vorbereiten
+        if: ${{ inputs.mode != 'backtest' }}
+        uses: actions/configure-pages@v5
+
+      - name: Web-App hochladen
+        if: ${{ inputs.mode != 'backtest' }}
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web
+
+      - name: Web-App veröffentlichen
+        if: ${{ inputs.mode != 'backtest' }}
+        id: deployment
+        uses: actions/deploy-pages@v4
