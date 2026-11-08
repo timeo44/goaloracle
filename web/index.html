@@ -384,9 +384,20 @@ a.team-link:hover .tname { text-decoration: underline; text-underline-offset: 3p
 .model-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) { .model-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .model-grid > * + * { border-left: 1px solid var(--line); } }
 @media (max-width: 899px) { .model-grid > * + * { border-top: 1px solid var(--line); } }
-.run-status { font-size: 13.5px; min-height: 1.4em; }
+.run-status { font-size: 13.5px; min-height: 1.4em; text-align: center; }
+.run-status:empty { display: none; }
+.setup { margin: 12px 14px 4px; padding: 12px; border: 1px dashed var(--home); border-radius: var(--radius); display: grid; gap: 10px; background: color-mix(in srgb, var(--home) 6%, transparent); }
+.setup-h { display: flex; gap: 10px; align-items: flex-start; }
+.setup-h small { display: block; color: var(--muted); font-size: 12.5px; }
+.step-n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--home); color: var(--surface); display: grid; place-items: center; font: 700 14px/1 var(--font-display); }
+.setup-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; }
+.setup-steps a { color: var(--home); font-weight: 600; }
+.key-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.btn-sm { font-size: 14px; padding: 10px 14px; }
+.toggle-list { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 12px; }
+.key-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 12.5px; }
+.key-links button, .key-links a { appearance: none; background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 12.5px; }
 .run-status .live { margin-right: 6px; }
-.gh-key summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
 .fact { background: var(--sunken); border-radius: 4px; padding: 8px 10px; }
 .fact dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
@@ -546,32 +557,33 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     <div class="panel" id="model-panel" style="margin-bottom:16px">
       <div class="panel-h"><h3>Modell</h3><span class="muted" style="font-size:12.5px" id="mdl-stamp"></span></div>
       <div class="model-grid">
-        <div class="panel-b" style="display:grid;gap:12px">
-          <div class="checks" id="run-opts">
-            <button type="button" class="chip" data-o="notify" aria-pressed="false">Telegram-Nachricht senden</button>
-            <button type="button" class="chip" data-o="refresh_odds" aria-pressed="false">Quoten neu laden</button>
-            <button type="button" class="chip" data-o="retune" aria-pressed="false">Einstellungen neu optimieren</button>
-          </div>
-          <button class="btn" type="button" id="run-btn">Modell jetzt neu rechnen</button>
-          <div id="run-status" class="run-status" aria-live="polite"></div>
-          <details class="gh-key" id="gh-key">
-            <summary>GitHub-Schlüssel für den Knopf <span class="muted" id="gh-key-state"></span></summary>
-            <div style="display:grid;gap:8px;margin-top:10px">
-              <p class="note" style="margin:0">Der Knopf startet den Lauf direkt auf GitHub. Dafür braucht die App einmalig einen Schlüssel, der nur auf diesem Gerät gespeichert wird.</p>
-              <ol class="note" style="margin:0;padding-left:18px">
-                <li>Auf GitHub: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:inherit">Settings → Developer settings → Fine-grained tokens → Generate</a></li>
-                <li>Name «GoalOracle», Ablauf z. B. 1 Jahr</li>
-                <li>Repository access: <b>Only select repositories</b> → goaloracle</li>
-                <li>Permissions → Repository → <b>Actions: Read and write</b></li>
-                <li>Erstellen, Schlüssel kopieren und hier einfügen</li>
-              </ol>
-              <div class="row2" style="grid-template-columns:1fr auto">
-                <input class="input" id="gh-token" type="password" autocomplete="off" placeholder="github_pat_…" aria-label="GitHub-Schlüssel">
-                <button type="button" class="chip" id="gh-save" aria-pressed="false">Speichern</button>
-              </div>
-              <button type="button" class="chip" id="gh-forget" aria-pressed="false" hidden>Schlüssel von diesem Gerät löschen</button>
+        <div style="display:grid;align-content:start">
+          <div class="setup" id="gh-setup">
+            <div class="setup-h"><span class="step-n">1</span><div><b>Einmalig einrichten</b><small>Damit der Knopf direkt auf GitHub rechnen kann. Dauert etwa 2 Minuten.</small></div></div>
+            <ol class="setup-steps">
+              <li>Öffne <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Neuer Schlüssel</a> (dort eingeloggt sein).</li>
+              <li><b>Token name:</b> GoalOracle · <b>Expiration:</b> 1 Jahr</li>
+              <li><b>Repository access:</b> Only select repositories → <b>goaloracle</b></li>
+              <li><b>Permissions → Repository permissions → Actions:</b> Read and write</li>
+              <li>Unten auf <b>Generate token</b>, den Schlüssel kopieren und hier einfügen:</li>
+            </ol>
+            <div class="key-row">
+              <input class="input" id="gh-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…" aria-label="GitHub-Schlüssel">
+              <button type="button" class="btn btn-sm" id="gh-save">Speichern</button>
             </div>
-          </details>
+            <p class="note" style="margin:0">Der Schlüssel bleibt nur auf diesem Gerät. Er erlaubt nur das Starten von Läufen in goaloracle.</p>
+          </div>
+          <div class="toggle-list" id="run-opts">
+            <label class="toggle" for="o-notify"><span>Telegram-Nachricht senden<small>Schickt die Top-Tipps gleich nach dem Lauf.</small></span><span class="switch"><input type="checkbox" id="o-notify" data-o="notify"><i></i></span></label>
+            <label class="toggle" for="o-odds"><span>Quoten neu laden<small id="o-odds-sub">Holt aktuelle Marktquoten. Kostet etwa 2 Credits pro Wettbewerb.</small></span><span class="switch"><input type="checkbox" id="o-odds" data-o="refresh_odds"><i></i></span></label>
+            <label class="toggle" for="o-retune"><span>Einstellungen neu optimieren<small>Rechnet den Rückblick neu. Dauert 5 bis 10 Minuten.</small></span><span class="switch"><input type="checkbox" id="o-retune" data-o="retune"><i></i></span></label>
+          </div>
+          <div class="panel-b" style="display:grid;gap:10px">
+            <button class="btn" type="button" id="run-btn">Jetzt neu rechnen</button>
+            <span class="note" id="run-sum" style="margin:0;text-align:center"></span>
+            <div id="run-status" class="run-status" aria-live="polite"></div>
+            <div class="key-links" id="key-links"></div>
+          </div>
         </div>
         <div class="panel-b" id="mdl-facts"></div>
       </div>
@@ -1615,15 +1627,45 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const max = Math.max(1.6, ...ch.map((x) => x[1]));
     $("#mdl-home").innerHTML = ch.length ? ch.map(([k, v]) => `<div><span>${esc(compName(k))}</span><i style="width:${Math.max(4, (v - 0.8) / (max - 0.8) * 90)}px"></i><b>${v.toFixed(2)}×</b></div>`).join("")
       : `<span class="muted">Nach dem nächsten Lauf verfügbar.</span>`;
-    $$("#run-opts .chip").forEach((b) => b.setAttribute("aria-pressed", String(!!runOpts[b.dataset.o])));
-    const has = !!ghToken();
-    $("#gh-key-state").textContent = has ? "· gespeichert" : "· fehlt";
-    $("#gh-forget").hidden = !has;
-    $("#run-btn").textContent = has ? "Modell jetzt neu rechnen" : "Auf GitHub neu rechnen";
+    renderRunUi();
   }
-  $("#run-opts").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; runOpts[b.dataset.o] = !runOpts[b.dataset.o]; store.set("go-run", runOpts); renderModel(); });
-  $("#gh-save").addEventListener("click", () => { const v = $("#gh-token").value.trim(); if (!v) return; try { localStorage.setItem("go-gh-token", v); } catch (e) { /* egal */ } $("#gh-token").value = ""; renderModel(); $("#run-status").textContent = "Schlüssel gespeichert."; });
-  $("#gh-forget").addEventListener("click", () => { try { localStorage.removeItem("go-gh-token"); } catch (e) { /* egal */ } renderModel(); $("#run-status").textContent = "Schlüssel gelöscht."; });
+  function renderRunUi() {
+    const has = !!ghToken(), g = GH();
+    $$("#run-opts input").forEach((c) => (c.checked = !!runOpts[c.dataset.o]));
+    $("#o-odds-sub").textContent = `Holt aktuelle Marktquoten. Kostet etwa 2 Credits pro Wettbewerb${data.odds && data.odds.credits != null ? `, noch ${data.odds.credits} übrig` : ""}.`;
+    $("#gh-setup").hidden = has;
+    const parts = [runOpts.notify ? "mit Telegram" : "ohne Telegram", runOpts.refresh_odds ? "neue Quoten" : "gespeicherte Quoten"];
+    if (runOpts.retune) parts.push("mit Optimierung");
+    $("#run-sum").textContent = `${runOpts.retune ? "Dauer etwa 5 bis 10 Minuten" : "Dauer etwa 3 Minuten"} · ${parts.join(" · ")}`;
+    const busy = $("#run-btn").dataset.busy === "1";
+    $("#run-btn").textContent = busy ? "Läuft …" : has ? "Jetzt neu rechnen" : "Zuerst Schlüssel speichern";
+    $("#run-btn").disabled = !has || busy;
+    $("#key-links").innerHTML = (has ? `<button type="button" id="gh-forget">Schlüssel von diesem Gerät löschen</button>` : "")
+      + (g ? `<a href="https://github.com/${esc(g.owner)}/${esc(g.repo)}/actions/workflows/daily.yml" target="_blank" rel="noopener">Ohne Schlüssel auf GitHub starten</a>` : "");
+  }
+  $("#run-opts").addEventListener("change", (e) => { const c = e.target.closest("input[data-o]"); if (!c) return; runOpts[c.dataset.o] = c.checked; store.set("go-run", runOpts); renderRunUi(); });
+  $("#gh-save").addEventListener("click", async () => {
+    const v = $("#gh-token").value.trim();
+    if (!v) { setRunStatus(`<span class="neg-d">Bitte zuerst den Schlüssel einfügen.</span>`); return; }
+    try { localStorage.setItem("go-gh-token", v); } catch (e) { /* egal */ }
+    $("#gh-token").value = "";
+    setRunStatus("Schlüssel wird geprüft …");
+    try {
+      const r = await ghFetch("/actions/workflows/daily.yml");
+      if (r.status === 401) throw new Error("Der Schlüssel ist ungültig. Bitte nochmals kopieren.");
+      if (r.status === 404 || r.status === 403) throw new Error("Der Schlüssel hat keinen Zugriff auf goaloracle. Prüf «Repository access» und «Actions: Read and write».");
+      setRunStatus(`<span class="pos-d">Schlüssel gespeichert.</span> Du kannst jetzt direkt neu rechnen.`);
+    } catch (e) {
+      try { localStorage.removeItem("go-gh-token"); } catch (er) { /* egal */ }
+      setRunStatus(`<span class="neg-d">${esc(e.message || "Prüfung fehlgeschlagen.")}</span>`);
+    }
+    renderRunUi();
+  });
+  $("#key-links").addEventListener("click", (e) => {
+    if (!e.target.closest("#gh-forget")) return;
+    try { localStorage.removeItem("go-gh-token"); } catch (er) { /* egal */ }
+    setRunStatus("Schlüssel gelöscht."); renderRunUi();
+  });
 
   let pollT = null;
   function setRunStatus(html) { $("#run-status").innerHTML = html; }
@@ -1634,13 +1676,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     return fetch(`https://api.github.com/repos/${g.owner}/${g.repo}${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
   }
   $("#run-btn").addEventListener("click", async () => {
-    const g = GH();
-    if (!ghToken()) {
-      if (g) { const a = document.createElement("a"); a.href = `https://github.com/${g.owner}/${g.repo}/actions/workflows/daily.yml`; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
-      setRunStatus(g ? `Auf GitHub: <b>Run workflow</b> antippen. Mit einem gespeicherten Schlüssel geht es direkt hier.` : "Repository unbekannt.");
-      return;
-    }
-    $("#run-btn").disabled = true;
+    if (!ghToken()) { $("#gh-token").focus(); return; }
+    $("#run-btn").dataset.busy = "1"; renderRunUi();
     setRunStatus("Lauf wird gestartet …");
     try {
       const started = Date.now();
@@ -1651,7 +1688,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       pollRun(started);
     } catch (e) {
       setRunStatus(`<span class="neg-d">${esc(e.message || "Start fehlgeschlagen.")}</span>`);
-      $("#run-btn").disabled = false;
+      $("#run-btn").dataset.busy = ""; renderRunUi();
     }
   });
   function pollRun(started) {
@@ -1666,7 +1703,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           setRunStatus(`<span class="live">Läuft</span> ${mm}:${ss} · ${runOpts.retune ? "mit Optimierung 5–10 Minuten" : "meist 2–4 Minuten"}${run && mine ? ` · <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">auf GitHub ansehen</a>` : ""}`);
           pollT = setTimeout(tick, 8000); return;
         }
-        if (run.conclusion !== "success") { setRunStatus(`<span class="neg-d">Lauf fehlgeschlagen.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`); $("#run-btn").disabled = false; return; }
+        if (run.conclusion !== "success") { setRunStatus(`<span class="neg-d">Lauf fehlgeschlagen.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`); $("#run-btn").dataset.busy = ""; renderRunUi(); return; }
         setRunStatus("Fertig. Neue Daten werden geladen …");
         setTimeout(reloadData, 15000);
       } catch (e) { pollT = setTimeout(tick, 10000); }
@@ -1682,7 +1719,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       render();
       setRunStatus(`<span class="pos-d">Aktualisiert</span> · Stand ${esc(fStamp.format(new Date(data.generated)))}`);
     } catch (e) { setRunStatus("Fertig. Lade die Seite neu, um die neuen Daten zu sehen."); }
-    $("#run-btn").disabled = false;
+    $("#run-btn").dataset.busy = ""; renderRunUi();
   }
 
   // ---------- Info-Blasen (Hover am Computer, Antippen am Handy) ----------
