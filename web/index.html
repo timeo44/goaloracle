@@ -231,6 +231,50 @@ dl { margin: 0; }
 .heat td.best { outline: 2px solid var(--ink); outline-offset: -2px; font-weight: 700; }
 .note { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
 
+/* ---------- Spielbericht ---------- */
+:root { --card-y: #E9B320; --card-r: #D23A2E; }
+.live { display: inline-flex; align-items: center; gap: 6px; font: 700 13px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--bad); }
+.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
+.tl-wrap { overflow-x: auto; }
+.timeline { width: 100%; height: auto; display: block; }
+.timeline .ax { stroke: var(--line); }
+.timeline .mid { stroke: var(--muted); stroke-width: 1.5; }
+.timeline .tk { fill: var(--muted); font: 600 10px var(--font-body); }
+.timeline .ht { stroke: var(--muted); stroke-dasharray: 3 3; }
+.timeline .side { fill: var(--muted); font: 700 11px var(--font-display); letter-spacing: .05em; }
+.timeline g[data-tip] { cursor: pointer; }
+.timeline g[data-tip]:hover .hit, .timeline g[data-tip]:focus .hit { fill: color-mix(in srgb, var(--home) 18%, transparent); }
+.timeline .hit { fill: transparent; }
+.ic-ball { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.ic-ball-c { fill: var(--ink); }
+.ic-y { fill: var(--card-y); } .ic-r { fill: var(--card-r); }
+.ic-in { stroke: var(--good); } .ic-out { stroke: var(--bad); }
+.ic-corner { stroke: var(--muted); fill: var(--muted); }
+.ic-var { fill: none; stroke: var(--bad); stroke-width: 1.5; }
+.tl-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.ev-list { list-style: none; margin: 0; padding: 0; }
+.ev-list li { display: grid; grid-template-columns: 44px 22px 1fr; gap: 8px; align-items: start; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.ev-list li.away { background: color-mix(in srgb, var(--sunken) 55%, transparent); }
+.ev-list .min { font: 700 15px/1.2 var(--font-display); color: var(--muted); }
+.ev-list svg { width: 18px; height: 18px; margin-top: 1px; }
+.ev-list small { color: var(--muted); display: block; }
+.statrow { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 9px 14px; border-top: 1px solid var(--line); }
+.statrow .nums { display: flex; justify-content: space-between; font-size: 13.5px; }
+.statrow .nums b { font: 700 17px/1 var(--font-display); }
+.statrow .nums span { color: var(--muted); }
+.statbar { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; height: 6px; }
+.statbar i { display: block; height: 100%; background: var(--sunken); border-radius: 2px; position: relative; overflow: hidden; }
+.statbar i b { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.statbar i:first-child b { right: 0; background: var(--home); } .statbar i:last-child b { left: 0; background: var(--away); }
+.verdict { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; text-align: center; padding: 12px 14px; }
+.verdict .lbl { display: block; margin-bottom: 4px; }
+.verdict b { font: 700 28px/1 var(--font-display); }
+.tips .num .status { margin-top: 2px; }
+tr[data-href] { cursor: pointer; }
+tr[data-href]:hover td { background: var(--sunken); }
+
 /* ---------- Form ---------- */
 .form { display: inline-flex; gap: 3px; }
 .form .fm { appearance: none; border: 0; padding: 0; cursor: pointer; width: 20px; height: 20px; border-radius: 3px; display: grid; place-items: center; font: 700 12px/1 var(--font-display); color: var(--surface); transition: transform .1s; }
@@ -432,7 +476,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
 <footer class="foot"><div class="wrap"><p id="model-note"></p><p>Wahrscheinlichkeiten aus einem statistischen Modell. Keine Garantie. Wette nur mit Geld, dessen Verlust dir nichts ausmacht. Hilfe bei Spielsucht: sos-spielsucht.ch</p></div></footer>
 
-<script>window.GO_DATA = null; window.GO_PAPER = null; window.GO_SIM = null; /*DATA*/</script>
+<script>window.GO_DATA = null; window.GO_PAPER = null; window.GO_SIM = null; window.GO_HISTORY = null; /*DATA*/</script>
 <script>
 (function () {
   "use strict";
@@ -513,8 +557,34 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   }
   function bestPick(u) { return rankOptions(options(u))[0] || null; }
 
+  // Hat ein Tipp gewonnen? null = nicht auswertbar
+  function hitOf(k, hg, ag, x) {
+    if (k.includes("+")) { const parts = k.split("+").map((p) => hitOf(p, hg, ag, x)); return parts.includes(null) ? null : parts.every(Boolean); }
+    if (k.startsWith("CS")) { const [i, j] = k.slice(2).split("-").map(Number); return hg === i && ag === j; }
+    if (k[0] === "C" || k[0] === "K") {
+      const h = k[0] === "C" ? x && x.hc : x && x.hy, a = k[0] === "C" ? x && x.ac : x && x.ay;
+      if (h == null || a == null) return null;
+      const rest = k.slice(1);
+      if (rest === "1") return h > a; if (rest === "X") return h === a; if (rest === "2") return h < a;
+      const line = parseFloat(rest.slice(1)); return rest[0] === "O" ? h + a > line : h + a < line;
+    }
+    const t = hg + ag;
+    const m = { "1": hg > ag, "X": hg === ag, "2": hg < ag, "1X": hg >= ag, "X2": hg <= ag, "12": hg !== ag,
+      "BTTS": hg > 0 && ag > 0, "NOBTTS": !(hg > 0 && ag > 0), "HS": hg > 0, "AS": ag > 0, "HO1.5": hg >= 2, "AO1.5": ag >= 2 };
+    if (k in m) return m[k];
+    if (k[0] === "O") return t > parseFloat(k.slice(1));
+    if (k[0] === "U") return t < parseFloat(k.slice(1));
+    return null;
+  }
+
   // ---------- Zustand ----------
-  let data = null, paper = null, sim = null;
+  let data = null, paper = null, sim = null, history = null;
+  function loadHistory() {
+    if (history) return Promise.resolve(history);
+    if (window.GO_HISTORY) return Promise.resolve((history = window.GO_HISTORY.history || []));
+    return fetch("history.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : { history: [] }))
+      .then((d) => (history = d.history || (data && data.history) || [])).catch(() => (history = (data && data.history) || []));
+  }
   let settings = null;
   let compFilter = store.get("go-comp") || "all";
   let rankComp = "europa";
@@ -705,6 +775,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   }
   function renderDetail(id) {
     const u = data.upcoming.find((x) => x.id === id);
+    const started = !u || new Date(u.kickoff).getTime() <= Date.now();
+    if (started) { renderReport(id, u); return; }
     const el = $("#view-spiel");
     if (!u) { el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="empty"><strong>Spiel nicht gefunden</strong>Es ist vielleicht schon vorbei.</div>`; return; }
     const d = new Date(u.kickoff), opts = options(u);
@@ -752,6 +824,225 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       </div>`;
     window.scrollTo(0, 0);
   }
+  // ---------- Spielbericht (live oder beendet) ----------
+  const ICON = {
+    goal: '<circle class="ic-ball" r="7"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z"/>',
+    own: '<circle class="ic-ball" r="7" style="stroke:var(--bad)"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z" style="fill:var(--bad)"/>',
+    pen: '<circle class="ic-ball" r="7"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z"/><text x="7" y="-4" style="font:700 8px var(--font-display);fill:var(--ink)">P</text>',
+    yellow: '<rect class="ic-y" x="-4" y="-6" width="8" height="12" rx="1.5"/>',
+    red: '<rect class="ic-r" x="-4" y="-6" width="8" height="12" rx="1.5"/>',
+    yr: '<rect class="ic-y" x="-6" y="-7" width="8" height="12" rx="1.5"/><rect class="ic-r" x="-2" y="-5" width="8" height="12" rx="1.5"/>',
+    sub: '<path class="ic-in" d="M-3 5V-5M-6-2l3-3 3 3" fill="none" stroke-width="1.8"/><path class="ic-out" d="M3-5V5M0 2l3 3 3-3" fill="none" stroke-width="1.8"/>',
+    var: '<rect class="ic-var" x="-8" y="-6" width="16" height="12" rx="2"/><text x="0" y="3" text-anchor="middle" style="font:700 7px var(--font-display);fill:var(--bad)">VAR</text>',
+    miss: '<circle class="ic-ball" r="7" style="stroke-dasharray:2 2"/><path d="M-5-5 5 5" style="stroke:var(--bad);stroke-width:1.8"/>',
+    corner: '<path class="ic-corner" d="M-3 6V-6" stroke-width="1.5"/><path class="ic-corner" d="M-3-6 5-3.5-3-1Z" stroke="none"/>',
+  };
+  const iconSvg = (t, size = 18) => `<svg viewBox="-9 -9 18 18" width="${size}" height="${size}" aria-hidden="true">${ICON[t]}</svg>`;
+  let tlShow = Object.assign({ corner: true, sub: true }, store.get("go-tl") || {});
+  const summaries = {};
+
+  function minuteOf(clock) {
+    const d = (clock && clock.displayValue) || "";
+    const m = d.match(/(\d+)'(?:\+(\d+))?/);
+    if (m) return { base: +m[1], extra: m[2] ? +m[2] : 0, label: d.replace(/'/g, "’") };
+    const v = clock && clock.value ? Math.ceil(clock.value / 60) : 0;
+    return { base: v, extra: 0, label: v + "’" };
+  }
+  function parseSummary(j) {
+    const comp = j.header && j.header.competitions && j.header.competitions[0];
+    if (!comp) return null;
+    const cs = comp.competitors || [];
+    const home = cs.find((c) => c.homeAway === "home") || cs[0], away = cs.find((c) => c.homeAway === "away") || cs[1];
+    const side = (teamId, name) => {
+      if (teamId && String(teamId) === String(home.team.id)) return "home";
+      if (teamId && String(teamId) === String(away.team.id)) return "away";
+      if (name) { const n = name.toLowerCase(); if ((home.team.displayName || "").toLowerCase() === n) return "home"; if ((away.team.displayName || "").toLowerCase() === n) return "away"; }
+      return null;
+    };
+    const st = (comp.status && comp.status.type) || {};
+    const evs = [], seen = new Set();
+    const add = (e) => { const key = e.type + e.min.label + (e.who || "") + e.side; if (seen.has(key)) return; seen.add(key); evs.push(e); };
+    for (const k of j.keyEvents || []) {
+      const tt = ((k.type && k.type.text) || "").toLowerCase(), txt = k.text || "";
+      const ps = (k.participants || []).map((p) => p.athlete && p.athlete.displayName).filter(Boolean);
+      const sd = side(k.team && k.team.id, k.team && k.team.displayName), min = minuteOf(k.clock);
+      if (!sd) continue;
+      let type = null, who = ps[0] || "", extra = "";
+      if (tt.includes("var") || /\bVAR\b/.test(txt) && /(disallow|no goal|overturn|cancel)/i.test(txt)) { type = "var"; extra = txt.replace(/^VAR Decision:\s*/i, ""); }
+      else if (k.scoringPlay || tt.includes("goal") || tt === "penalty - scored") {
+        type = /own goal/i.test(tt + txt) ? "own" : /penalty/i.test(tt) ? "pen" : "goal";
+        if (ps[1]) extra = "Vorlage: " + ps[1];
+      } else if (tt.includes("penalty") && (tt.includes("miss") || tt.includes("saved"))) type = "miss";
+      else if (tt.includes("yellow") && tt.includes("red") || tt.includes("second yellow")) type = "yr";
+      else if (tt.includes("red card")) type = "red";
+      else if (tt.includes("yellow card")) type = "yellow";
+      else if (tt.includes("substitution")) { type = "sub"; extra = ps[1] ? "für " + ps[1] : ""; }
+      if (type) add({ type, side: sd, min, who, extra });
+    }
+    for (const c of j.commentary || []) {
+      const pl = c.play || {}, tt = ((pl.type && pl.type.text) || "").toLowerCase(), txt = c.text || "";
+      const min = minuteOf(pl.clock || c.time);
+      if (tt === "corner awarded") {
+        const sd = side(pl.team && pl.team.id, (pl.team && pl.team.displayName) || (txt.match(/^Corner,\s*([^.]+)\./) || [])[1]);
+        if (sd) evs.push({ type: "corner", side: sd, min, who: "", extra: "" });
+      } else if (/\bVAR\b/.test(txt) && /(disallow|no goal|overturn|ruled out)/i.test(txt)) {
+        const nm = (txt.match(/\(([^)]+)\)/) || [])[1];
+        const sd = side(pl.team && pl.team.id, (pl.team && pl.team.displayName) || nm);
+        if (sd) add({ type: "var", side: sd, min, who: "", extra: txt });
+      }
+    }
+    evs.sort((a, b) => a.min.base - b.min.base || a.min.extra - b.min.extra);
+    const stats = {};
+    for (const t of (j.boxscore && j.boxscore.teams) || []) {
+      const sd = side(t.team && t.team.id);
+      if (!sd) continue;
+      for (const s of t.statistics || []) { (stats[s.name] = stats[s.name] || {})[sd] = s.displayValue; }
+    }
+    return {
+      home: { id: home.team.id, name: home.team.shortDisplayName || home.team.displayName, score: +home.score || 0 },
+      away: { id: away.team.id, name: away.team.shortDisplayName || away.team.displayName, score: +away.score || 0 },
+      state: st.state, completed: !!st.completed, statusName: st.name || "", detail: st.shortDetail || st.detail || "",
+      events: evs, stats,
+      maxMin: Math.max(90, ...evs.map((e) => e.min.base)) > 90 ? 120 : 90,
+    };
+  }
+
+  function timelineSvg(S, base) {
+    // Breite = echte Breite der Grafik, damit Symbole auf jedem Gerät gleich gross bleiben
+    const avail = Math.max(300, Math.min(900, ($("#view-spiel").clientWidth || 640) - 30));
+    const W = Math.round(avail), H = 172, L = 40, R = 10, mid = 86, maxM = S.maxMin;
+    const X = (m) => L + Math.min(m.base + Math.min(m.extra, 6) * 0.35, maxM + 2) / (maxM + 2) * (W - L - R);
+    const ticks = (W < 420 ? [0, 30, 45, 60, 90] : [0, 15, 30, 45, 60, 75, 90]).concat(maxM > 90 ? [105, 120] : [])
+      .map((m) => `<text class="tk" x="${X({ base: m, extra: 0 })}" y="${mid + 4}" text-anchor="middle">${m}</text>`).join("");
+    const lanes = { home: [], away: [] };
+    const icons = S.events.filter((e) => tlShow[e.type] !== false).map((e) => {
+      const x = X(e.min), L2 = lanes[e.side];
+      let lane = 0; while (L2.some((p) => p.lane === lane && Math.abs(p.x - x) < 15)) lane++;
+      L2.push({ x, lane });
+      const dist = (e.type === "corner" ? 22 : 30) + lane * 19;
+      const y = e.side === "home" ? mid - dist : mid + dist;
+      const team = e.side === "home" ? base.home.name : base.away.name;
+      const tip = `${e.min.label} ${({ goal: "Tor", own: "Eigentor", pen: "Penaltytor", miss: "Penalty verschossen", yellow: "Gelbe Karte", red: "Rote Karte", yr: "Gelb-Rot", sub: "Wechsel", var: "VAR: Tor aberkannt", corner: "Eckball" })[e.type]} · ${e.who || team}${e.extra ? " (" + e.extra + ")" : ""}`;
+      return `<g transform="translate(${x.toFixed(1)},${y})" data-tip="${esc(tip)}" tabindex="0" role="img" aria-label="${esc(tip)}"><rect class="hit" x="-10" y="-10" width="20" height="20" rx="4"/>${ICON[e.type]}</g>`;
+    }).join("");
+    return `<svg class="timeline" viewBox="0 0 ${W} ${H}" role="img" aria-label="Spielverlauf">
+      <line class="mid" x1="${L}" x2="${W - R}" y1="${mid - 10}" y2="${mid - 10}"/><line class="mid" x1="${L}" x2="${W - R}" y1="${mid + 10}" y2="${mid + 10}"/>
+      <line class="ht" x1="${X({ base: 45, extra: 0 })}" x2="${X({ base: 45, extra: 0 })}" y1="8" y2="${H - 8}"/>
+      ${maxM > 90 ? `<line class="ht" x1="${X({ base: 90, extra: 0 })}" x2="${X({ base: 90, extra: 0 })}" y1="8" y2="${H - 8}"/>` : ""}
+      ${ticks}
+      <text class="side" x="2" y="${mid - 26}">${esc(base.home.tla)}</text><text class="side" x="2" y="${mid + 34}">${esc(base.away.tla)}</text>
+      ${icons}</svg>`;
+  }
+
+  const STAT_ROWS = [["possessionPct", "Ballbesitz", "%"], ["totalShots", "Schüsse"], ["shotsOnTarget", "Schüsse aufs Tor"], ["wonCorners", "Eckbälle"],
+    ["foulsCommitted", "Fouls"], ["yellowCards", "Gelbe Karten"], ["redCards", "Rote Karten"], ["offsides", "Abseits"], ["saves", "Paraden"],
+    ["totalPasses", "Pässe"], ["passPct", "Passquote", "pct"]];
+  function statsHtml(S) {
+    const rows = STAT_ROWS.filter(([k]) => S.stats[k]).map(([k, name, unit]) => {
+      let h = parseFloat(S.stats[k].home) || 0, a = parseFloat(S.stats[k].away) || 0;
+      let hs = String(S.stats[k].home ?? "–"), as = String(S.stats[k].away ?? "–");
+      if (unit === "pct") { hs = Math.round(h * 100) + "%"; as = Math.round(a * 100) + "%"; }
+      if (unit === "%") { hs = Math.round(h) + "%"; as = Math.round(a) + "%"; }
+      const max = Math.max(h, a, 0.0001);
+      return `<div class="statrow"><div class="nums"><b>${esc(hs)}</b><span>${esc(name)}</span><b>${esc(as)}</b></div>
+        <div class="statbar"><i><b style="width:${h / max * 100}%"></b></i><i><b style="width:${a / max * 100}%"></b></i></div></div>`;
+    }).join("");
+    return rows || `<div class="panel-b muted">Für dieses Spiel liefert ESPN keine Statistiken.</div>`;
+  }
+  function eventListHtml(S, base) {
+    const list = S.events.filter((e) => e.type !== "corner" && tlShow[e.type] !== false);
+    if (!list.length) return `<div class="panel-b muted">Noch keine Ereignisse.</div>`;
+    const name = { goal: "Tor", own: "Eigentor", pen: "Penaltytor", miss: "Penalty verschossen", yellow: "Gelbe Karte", red: "Rote Karte", yr: "Gelb-Rot", sub: "Wechsel", var: "VAR: Tor aberkannt" };
+    return `<ul class="ev-list">${list.map((e) => `<li class="${e.side}"><span class="min">${esc(e.min.label)}</span>${iconSvg(e.type)}
+      <span><b>${esc(e.who || name[e.type])}</b>${e.who ? ` · ${name[e.type]}` : ""} · ${esc(e.side === "home" ? base.home.name : base.away.name)}${e.extra ? `<small>${esc(e.extra)}</small>` : ""}</span></li>`).join("")}</ul>`;
+  }
+
+  function ourTipsHtml(base, S) {
+    const finished = S && S.completed;
+    const et = S && /AET|PEN|EXTRA/i.test(S.statusName);
+    const hg = S ? S.home.score : null, ag = S ? S.away.score : null;
+    const extra = S && S.stats.wonCorners ? { hc: +S.stats.wonCorners.home, ac: +S.stats.wonCorners.away,
+      hy: S.stats.yellowCards ? +S.stats.yellowCards.home : null, ay: S.stats.yellowCards ? +S.stats.yellowCards.away : null } : null;
+    const badge = (k) => {
+      if (!S || S.state === "pre") return `<span class="status open">offen</span>`;
+      if (!finished) return `<span class="status open">läuft</span>`;
+      if (et) return `<span class="status void">n. V.</span>`;
+      const h = hitOf(k, hg, ag, extra);
+      return h === null ? `<span class="status void">–</span>` : `<span class="status ${h ? "won" : "lost"}">${h ? "✓ richtig" : "✗ falsch"}</span>`;
+    };
+    const u = { home: base.home, away: base.away };
+    const list = (arr) => `<ol class="tips">${arr.map((t, i) => `<li><span class="rank-n">${i + 1}</span>
+      <span><span class="what">${esc(label(t.key, u))}</span><br><span class="meta">Chance ${pct(t.p)}${t.odds ? ` · Quote ${t.odds.toFixed(2)}` : ` · faire Quote ${(1 / t.p).toFixed(2)}`}</span></span>
+      <span class="num">${badge(t.key)}</span></li>`).join("")}</ol>`;
+    const tips = base.tips && base.tips.length ? base.tips : base.pick ? [base.pick] : [];
+    const combos = base.combos || [];
+    const scoreHit = finished && !et ? (base.score[0] === hg && base.score[1] === ag) : null;
+    const tipHit = finished && !et ? hitOf(base.tip, hg, ag) : null;
+    return `<div class="panel"><div class="panel-h"><h3>Unsere Tipps</h3><span class="muted" style="font-size:12.5px">Stand vor Anpfiff</span></div>
+      <div class="verdict">
+        <div><span class="lbl">Tipp 1X2</span><b>${esc(base.tip)}</b><br>${tipHit === null ? "" : `<span class="status ${tipHit ? "won" : "lost"}">${tipHit ? "✓" : "✗"}</span>`}</div>
+        <div><span class="lbl">Resultat-Tipp</span><b>${base.score[0]}:${base.score[1]}</b><br>${scoreHit === null ? "" : `<span class="status ${scoreHit ? "exact" : "lost"}">${scoreHit ? "Exakt" : "✗"}</span>`}</div>
+        <div><span class="lbl">${S && S.state === "in" ? "Stand" : "Endstand"}</span><b>${S && S.state !== "pre" ? `${hg}:${ag}` : "–"}</b><br>${S && S.state === "in" ? `<span class="live">Live</span>` : ""}</div>
+      </div>
+      ${tips.length ? `<div class="panel-h" style="border-top:1px solid var(--line)"><h3 style="font-size:15px">Beste Tipps</h3></div>${list(tips)}` : ""}
+      ${combos.length ? `<div class="panel-h" style="border-top:1px solid var(--line)"><h3 style="font-size:15px">Kombis im Spiel</h3></div>${list(combos)}` : ""}
+      ${!tips.length && !combos.length ? `<div class="panel-b muted">Für dieses Spiel wurden noch keine Tipps gespeichert.</div>` : ""}
+    </div>`;
+  }
+
+  function renderReport(id, u) {
+    const el = $("#view-spiel");
+    el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="panel"><div class="empty">Spiel wird geladen …</div></div>`;
+    loadHistory().then(() => {
+      const h = history.find((x) => x.id === id);
+      const base = h || (u && { ...u, tips: rankOptions(options(u).filter((o) => groupOf(o.k) !== "combo")).slice(0, 5).map((o) => ({ key: o.k, p: o.p, odds: o.odds })),
+        combos: rankOptions(options(u).filter((o) => groupOf(o.k) === "combo")).slice(0, 3).map((o) => ({ key: o.k, p: o.p, odds: o.odds })) });
+      if (!base) { el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button><div class="empty"><strong>Spiel nicht gefunden</strong>Zu diesem Spiel gibt es keine gespeicherten Tipps.</div>`; return; }
+      const draw = (S, err) => {
+        if (location.hash !== "#spiel-" + id) return;
+        const d = new Date(base.kickoff);
+        const score = S && S.state !== "pre" ? [S.home.score, S.away.score] : null;
+        const status = !S ? "" : S.state === "in" ? `<span class="live">Live ${esc(S.detail)}</span>` : S.completed ? esc(S.detail || "Beendet") : "Noch nicht angepfiffen";
+        el.innerHTML = `<button class="back" type="button" data-back>← Zurück</button>
+          <div class="match-hero">
+            <div class="hero-meta">${esc(compName(base.comp))} · ${esc(fDay.format(d))}, ${fTime.format(d)}</div>
+            <div class="hero-teams">
+              <div class="hero-team">${crest(base.home, "lg")}<span class="tname">${esc(base.home.name)}</span>${formHtml(base.home)}</div>
+              <div class="hero-score"><span class="lbl">${score ? "Resultat" : "Resultat-Tipp"}</span><div class="bug"><span>${score ? score[0] : base.score[0]}</span><span>${score ? score[1] : base.score[1]}</span></div><span class="muted" style="font-size:12.5px">${status}</span></div>
+              <div class="hero-team">${crest(base.away, "lg")}<span class="tname">${esc(base.away.name)}</span>${formHtml(base.away)}</div>
+            </div>
+            ${base.p ? `<div class="probs" style="padding:0"><div class="bar"><i class="h" style="width:${base.p[0] * 100}%"></i><i class="d" style="width:${base.p[1] * 100}%"></i><i class="a" style="width:${base.p[2] * 100}%"></i></div>
+              <div class="legend"><span>1 <b>${pct(base.p[0])}</b></span><span class="muted">Prognose vor dem Spiel${base.xg ? ` · xG ${base.xg[0].toFixed(1)} – ${base.xg[1].toFixed(1)}` : ""}</span><span>2 <b>${pct(base.p[2])}</b></span></div></div>` : ""}
+          </div>
+          <div class="detail-grid">
+            <div style="display:grid;gap:16px;min-width:0">
+              ${ourTipsHtml(base, S)}
+              <div class="panel"><div class="panel-h"><h3>Spielverlauf</h3><span class="muted" style="font-size:12.5px">Symbole antippen für Details</span></div>
+                <div class="panel-b">${S ? `<div class="tl-tools" role="group" aria-label="Anzeigen">
+                    <button type="button" class="chip" data-tl="corner" aria-pressed="${tlShow.corner !== false}">${iconSvg("corner", 14)} Eckbälle</button>
+                    <button type="button" class="chip" data-tl="sub" aria-pressed="${tlShow.sub !== false}">${iconSvg("sub", 14)} Wechsel</button></div>
+                  <div class="tl-wrap">${timelineSvg(S, base)}</div>` : `<div class="muted">${err ? "Spieldetails konnten nicht geladen werden. Versuch es später nochmals." : "Lädt …"}</div>`}</div>
+                ${S ? eventListHtml(S, base) : ""}</div>
+            </div>
+            <div class="panel"><div class="panel-h"><h3>Statistik</h3><span class="muted" style="font-size:12.5px">${esc(base.home.tla)} links · ${esc(base.away.tla)} rechts</span></div>${S ? statsHtml(S) : `<div class="panel-b muted">${err ? "Nicht verfügbar." : "Lädt …"}</div>`}</div>
+          </div>`;
+        el.dataset.id = id;
+      };
+      draw(summaries[id] || null, false);
+      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${encodeURIComponent(base.comp)}/summary?event=${encodeURIComponent(id)}`;
+      fetch(url).then((r) => r.json()).then((j) => { const S = parseSummary(j); if (!S) throw new Error(); summaries[id] = S; draw(S, false); })
+        .catch(() => draw(summaries[id] || null, true));
+    });
+    window.scrollTo(0, 0);
+  }
+  let rsT;
+  window.addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { const id = $("#view-spiel").dataset.id; if (!$("#view-spiel").hidden && id && summaries[id]) renderReport(id, data.upcoming.find((x) => x.id === id)); }, 250); });
+  $("#view-spiel").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tl]"); if (!b) return;
+    tlShow[b.dataset.tl] = b.getAttribute("aria-pressed") !== "true"; store.set("go-tl", tlShow);
+    const id = $("#view-spiel").dataset.id; if (id && summaries[id]) renderReport(id, data.upcoming.find((x) => x.id === id));
+  });
+
   document.addEventListener("click", (e) => { if (e.target.closest("[data-back]")) { history.length > 1 ? history.back() : (location.hash = "spiele"); } });
 
   // ---------- Testlauf: Rückblick ----------
@@ -933,31 +1224,34 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   // ---------- Bilanz ----------
   function renderBilanz() {
-    const done = data.history.filter((h) => Array.isArray(h.result));
-    const out = (a, b) => (a > b ? "1" : a === b ? "X" : "2");
-    const hits = done.filter((h) => h.tip === out(h.result[0], h.result[1])).length;
-    const exact = done.filter((h) => h.score[0] === h.result[0] && h.score[1] === h.result[1]).length;
-    const picks = done.filter((h) => h.pick && typeof h.pick.hit === "boolean");
-    const pickHits = picks.filter((h) => h.pick.hit).length;
+    const S = data.history_summary || { done: 0, open: 0, hits_1x2: 0, exact: 0, picks: 0, pick_hits: 0 };
     const rate = (a, b) => (b ? pct(a / b) : "–");
     $("#kpis").innerHTML = `
-      <div class="kpi"><dt data-tip="Wie oft der Tipp, den die App pro Spiel als besten zeigt, gestimmt hat.">Bester Tipp richtig</dt><dd>${rate(pickHits, picks.length)}<small>${pickHits} von ${picks.length}</small></dd></div>
-      <div class="kpi"><dt data-tip="Wie oft der wahrscheinlichste Ausgang (Heimsieg, Remis, Auswärtssieg) eingetreten ist.">1X2 richtig</dt><dd>${rate(hits, done.length)}<small>${hits} von ${done.length}</small></dd></div>
-      <div class="kpi"><dt data-tip="Wie oft der Resultat-Tipp genau gestimmt hat.">Resultat exakt</dt><dd>${rate(exact, done.length)}<small>${exact} von ${done.length}</small></dd></div>
-      <div class="kpi"><dt>Offen</dt><dd>${data.history.filter((h) => h.result === null).length}<small>nach Abpfiff ausgewertet</small></dd></div>`;
-    if (!data.history.length) { $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Noch keine Bilanz</strong>Sobald getippte Spiele gespielt sind, steht hier, ob die Tipps gestimmt haben.</div></td></tr></tbody>`; return; }
-    $("#log").innerHTML = `<thead><tr><th class="hide-sm">Datum</th><th>Spiel</th><th>Bester Tipp</th><th class="num">Tipp</th><th class="num">Ergebnis</th></tr></thead><tbody>${data.history.slice(0, 200).map((h) => {
-      let res = `<span class="muted">offen</span>`, st = "";
-      if (Array.isArray(h.result)) {
-        res = `<b>${h.result[0]}:${h.result[1]}</b>`;
-        const ex = h.score[0] === h.result[0] && h.score[1] === h.result[1], ok = h.tip === out(h.result[0], h.result[1]);
-        st = ex ? `<span class="status exact">Exakt</span>` : ok ? `<span class="status won">1X2 ✓</span>` : `<span class="status lost">1X2 ✗</span>`;
-      } else if (h.result === "et" || h.result === "void") res = `<span class="muted">${h.result === "et" ? "Verlängerung" : "abgesagt"}</span>`;
-      const pk = h.pick ? `${esc(label(h.pick.key, h))} ${typeof h.pick.hit === "boolean" ? `<span class="status ${h.pick.hit ? "won" : "lost"}">${h.pick.hit ? "✓" : "✗"}</span>` : ""}` : "–";
-      return `<tr><td class="hide-sm muted">${esc(fShort.format(new Date(h.kickoff)))}</td>
-        <td><span class="t">${crest(h.home, "sm")}${crest(h.away, "sm")}<span class="hide-sm">${esc(h.home.name)} – ${esc(h.away.name)}</span></span></td>
-        <td style="white-space:normal">${pk}</td><td class="num">${h.tip} <span class="muted">${h.score[0]}:${h.score[1]}</span></td><td class="num">${res} ${st}</td></tr>`; }).join("")}</tbody>`;
+      <div class="kpi"><dt data-tip="Wie oft der Tipp, den die App pro Spiel als besten zeigt, gestimmt hat.">Bester Tipp richtig</dt><dd>${rate(S.pick_hits, S.picks)}<small>${S.pick_hits} von ${S.picks}</small></dd></div>
+      <div class="kpi"><dt data-tip="Wie oft der wahrscheinlichste Ausgang (Heimsieg, Remis, Auswärtssieg) eingetreten ist.">1X2 richtig</dt><dd>${rate(S.hits_1x2, S.done)}<small>${S.hits_1x2} von ${S.done}</small></dd></div>
+      <div class="kpi"><dt data-tip="Wie oft der Resultat-Tipp genau gestimmt hat.">Resultat exakt</dt><dd>${rate(S.exact, S.done)}<small>${S.exact} von ${S.done}</small></dd></div>
+      <div class="kpi"><dt>Offen</dt><dd>${S.open}<small>nach Abpfiff ausgewertet</small></dd></div>`;
+    $("#log").innerHTML = `<tbody><tr><td><div class="empty">Bilanz wird geladen …</div></td></tr></tbody>`;
+    loadHistory().then((hist) => {
+      if (!hist.length) { $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Noch keine Bilanz</strong>Sobald getippte Spiele gespielt sind, steht hier, ob die Tipps gestimmt haben.</div></td></tr></tbody>`; return; }
+      const out = (a, b) => (a > b ? "1" : a === b ? "X" : "2");
+      const now = Date.now();
+      const rows = hist.filter((h) => new Date(h.kickoff).getTime() <= now + 3600e3).slice(0, 250);
+      $("#log").innerHTML = `<thead><tr><th class="hide-sm">Datum</th><th>Spiel</th><th>Bester Tipp</th><th class="num">Tipp</th><th class="num">Ergebnis</th></tr></thead><tbody>${rows.map((h) => {
+        let res = new Date(h.kickoff).getTime() > now ? `<span class="muted">bald</span>` : `<span class="muted">offen</span>`, st = "";
+        if (Array.isArray(h.result)) {
+          res = `<b>${h.result[0]}:${h.result[1]}</b>`;
+          const ex = h.score[0] === h.result[0] && h.score[1] === h.result[1], ok = h.tip === out(h.result[0], h.result[1]);
+          st = ex ? `<span class="status exact">Exakt</span>` : ok ? `<span class="status won">1X2 ✓</span>` : `<span class="status lost">1X2 ✗</span>`;
+        } else if (h.result === "et" || h.result === "void") res = `<span class="muted">${h.result === "et" ? "Verlängerung" : "abgesagt"}</span>`;
+        const pk = h.pick ? `${esc(label(h.pick.key, h))} ${typeof h.pick.hit === "boolean" ? `<span class="status ${h.pick.hit ? "won" : "lost"}">${h.pick.hit ? "✓" : "✗"}</span>` : ""}` : "–";
+        return `<tr data-href="#spiel-${esc(h.id)}" tabindex="0"><td class="hide-sm muted">${esc(fShort.format(new Date(h.kickoff)))}</td>
+          <td><span class="t">${crest(h.home, "sm")}${crest(h.away, "sm")}<span class="hide-sm">${esc(h.home.name)} – ${esc(h.away.name)}</span></span></td>
+          <td style="white-space:normal">${pk}</td><td class="num">${h.tip} <span class="muted">${h.score[0]}:${h.score[1]}</span></td><td class="num">${res} ${st}</td></tr>`; }).join("")}</tbody>`;
+    });
   }
+  $("#log").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr) location.hash = tr.dataset.href.slice(1); });
+  $("#log").addEventListener("keydown", (e) => { const tr = e.target.closest("tr[data-href]"); if (tr && e.key === "Enter") location.hash = tr.dataset.href.slice(1); });
 
   // ---------- Einstellungen ----------
   function renderSettings() {
@@ -994,7 +1288,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   document.addEventListener("pointerout", (e) => { if (e.pointerType !== "mouse") return; const el = tipTarget(e.target); if (el && !el.contains(e.relatedTarget)) hideTip(); });
   document.addEventListener("click", (e) => {
     const el = tipTarget(e.target);
-    if (el && (el.classList.contains("fm") || el.matches("th, dt, td, .ev, .lbl, span"))) {
+    if (el && (el.classList.contains("fm") || el.matches("th, dt, td, .ev, .lbl, span, g"))) {
       if (el.classList.contains("fm") || el.closest("a")) { e.preventDefault(); e.stopPropagation(); }
       tipFor === el && e.pointerType !== "mouse" ? hideTip() : showTip(el);
       return;
@@ -1026,7 +1320,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#stamp").textContent = "Keine Daten";
     $("#matches").innerHTML = `<div class="empty"><strong>Noch keine Daten</strong>Die Datei data.json entsteht beim nächsten Lauf des Bots auf GitHub.</div>`;
   }
-  if (window.GO_DATA) { data = window.GO_DATA; paper = window.GO_PAPER; sim = window.GO_SIM; render(); return; }
+  if (window.GO_DATA) { data = window.GO_DATA; paper = window.GO_PAPER; sim = window.GO_SIM; if (window.GO_HISTORY) history = window.GO_HISTORY.history; render(); return; }
   Promise.all([
     fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
     fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),

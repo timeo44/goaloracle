@@ -65,6 +65,32 @@ def pick_best(markets: dict, odds: dict, risk: str = "ausgewogen", groups=DEFAUL
     return None
 
 
+def top_options(markets: dict, odds: dict, risk: str = "ausgewogen", n_single: int = 5, n_combo: int = 3):
+    """Wie die Web-App mit Standard-Einstellungen: beste Einzeltipps und Kombis im Spiel."""
+    R = C.RISK[risk]
+    rows = []
+    for k, p in markets.items():
+        g = group_of(k)
+        if g not in DEFAULT_GROUPS or p <= 0.001:
+            continue
+        o = odds.get(k)
+        q = o or 1 / p
+        in_win = R["min_odds"] <= q <= R["max_odds"]
+        ev = p * o - 1 if o else None
+        rows.append({"key": k, "p": round(p, 3), "odds": round(o, 2) if o else None,
+                     "ev": round(ev, 3) if ev is not None else None,
+                     "value": ev is not None and ev >= R["min_ev"] and in_win, "in": in_win, "g": g})
+
+    def ranked(rs):
+        val = sorted([r for r in rs if r["value"]], key=lambda r: -r["ev"])
+        safe = sorted([r for r in rs if not r["value"] and r["in"]], key=lambda r: -r["p"])
+        return [{k: v for k, v in r.items() if k in ("key", "p", "odds", "ev")} for r in val + safe]
+
+    singles = ranked([r for r in rows if r["g"] != "combo"])[:n_single]
+    combos = ranked([r for r in rows if r["g"] == "combo"])[:n_combo]
+    return singles, combos
+
+
 def to_matches(events: list[dict]) -> list[Match]:
     out = []
     for e in events:
@@ -205,8 +231,10 @@ def update_history(prev: list[dict], upcoming: list[dict], events_by_id: dict, n
             hist[u["id"]] = {"id": u["id"], "kickoff": u["kickoff"], "comp": u["comp"],
                              "home": {k: u["home"].get(k, "") for k in ("name", "tla", "logo")},
                              "away": {k: u["away"].get(k, "") for k in ("name", "tla", "logo")},
-                             "p": u["p"], "tip": u["tip"], "score": u["score"][:2],
+                             "p": u["p"], "tip": u["tip"], "score": u["score"][:2], "xg": u["xg"],
                              "pick": u["pick"], "result": None}
+            singles, combos = top_options(u["m"], u["odds"] if u["known"] else {})
+            hist[u["id"]]["tips"], hist[u["id"]]["combos"] = singles, combos
     for h in hist.values():
         if h.get("result") is not None:
             continue
@@ -217,12 +245,26 @@ def update_history(prev: list[dict], upcoming: list[dict], events_by_id: dict, n
             h["result"] = "void"
         elif e["completed"] and e["hs"] is not None:
             h["result"] = [e["hs"], e["as"]] if e["status"] in FINAL_90 else "et"
-            if h.get("pick") and h["result"] not in ("et", "void"):
-                h["pick"]["hit"] = outcome_hit(h["pick"]["key"], e["hs"], e["as"], e.get("fd"))
+            if h["result"] not in ("et", "void"):
+                if h.get("pick"):
+                    h["pick"]["hit"] = outcome_hit(h["pick"]["key"], e["hs"], e["as"], e.get("fd"))
+                for t in h.get("tips", []) + h.get("combos", []):
+                    t["hit"] = outcome_hit(t["key"], e["hs"], e["as"], e.get("fd"))
     keep = [h for h in hist.values()
             if h.get("result") is not None or parse_date(h["kickoff"]) > now - timedelta(days=4)]
     keep.sort(key=lambda h: h["kickoff"], reverse=True)
-    return keep[:1500]
+    return keep[:1200]
+
+
+def history_summary(history: list[dict]) -> dict:
+    """Kurzfassung der Bilanz für den Start der App."""
+    done = [h for h in history if isinstance(h.get("result"), list)]
+    out = lambda a, b: "1" if a > b else "X" if a == b else "2"
+    picks = [h for h in done if h.get("pick") and isinstance(h["pick"].get("hit"), bool)]
+    return {"done": len(done), "open": sum(1 for h in history if h.get("result") is None),
+            "hits_1x2": sum(1 for h in done if h["tip"] == out(*h["result"])),
+            "exact": sum(1 for h in done if h["score"] == h["result"]),
+            "picks": len(picks), "pick_hits": sum(1 for h in picks if h["pick"]["hit"])}
 
 
 # ---------------- Rückblick (Simulation mit historischen Quoten) ----------------

@@ -131,7 +131,8 @@ def main():
             odds[u["id"]] = u["odds"]
 
     upcoming = E.build_upcoming(models, events, info, form, odds, now)
-    history = E.update_history(prev.get("history", []), upcoming, by_id, now)
+    prev_hist = load_json(WEB / "history.json", {}).get("history") or prev.get("history", [])
+    history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
     rankings = E.build_rankings(models, events, info, form, now)
 
@@ -143,7 +144,8 @@ def main():
         "model": {"club_teams": len(models.club.teams), "club_matches": models.club.n_matches,
                   "home_adv": round(2.718281828 ** models.club.home_adv, 2),
                   "corners": bool(models.corners)},
-        "upcoming": upcoming, "rankings": rankings, "history": history,
+        "upcoming": upcoming, "rankings": rankings,
+        "history_summary": E.history_summary(history),
         "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
     # Form-Details nur für Teams, die in der App vorkommen
@@ -154,6 +156,7 @@ def main():
     data["teams"] = {t: info[t] for t in opp if t in info}
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
+    write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
     if not args.skip_sim:
         write_json(WEB / "sim.json", {"generated": now.isoformat(), "rows": E.build_sim(events, now)})
     print(f"Web-Daten: {len(upcoming)} Spiele, {len(history)} in der Bilanz, "
