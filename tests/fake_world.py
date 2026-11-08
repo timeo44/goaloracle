@@ -60,7 +60,7 @@ def game(slug, d, h, a, neutral=False):
     if done and slug in C.TOP5 + ["ned.1", "por.1", "eng.2"]:
         p1 = 1 / (1 + np.exp(-(lam - mu) * 1.3))
         ev["fd"] = {"hc": int(rng.poisson(5.3)), "ac": int(rng.poisson(4.4)), "hy": int(rng.poisson(1.8)),
-                    "ay": int(rng.poisson(2.1)), "o1": round(0.93 / max(p1 * .75, .05), 2), "oX": 3.5,
+                    "ay": int(rng.poisson(2.1)), "hst": int(rng.poisson(lam * 3.2)), "ast": int(rng.poisson(mu * 3.2)), "o1": round(0.93 / max(p1 * .75, .05), 2), "oX": 3.5,
                     "o2": round(0.93 / max((1 - p1) * .75, .05), 2), "oO25": 1.85, "oU25": 1.95}
     events.append(ev)
 
@@ -109,7 +109,8 @@ def run():
         def now(cls, tz=None):
             return NOW
 
-    with mock.patch.object(bot, "WEB", out), mock.patch.object(bot, "datetime", FixedDT), \
+    with mock.patch.object(bot, "WEB", out), mock.patch.object(bot, "ROOT", out), \
+            mock.patch.object(bot, "datetime", FixedDT), \
             mock.patch.object(bot.espn, "load", lambda *a, **k: events), \
             mock.patch.object(bot.fdcouk, "fetch", lambda *a, **k: {}), \
             mock.patch.object(bot.fdcouk, "attach", lambda *a, **k: 0), \

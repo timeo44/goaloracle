@@ -67,7 +67,7 @@ def _fetch_month(slug: str, ym: str, retries: int = 3) -> list[dict] | None:
                         out.append(c)
                 return out
             if r.status_code in (400, 404):
-                return None  # Wettbewerb/Monat existiert nicht
+                return []  # Wettbewerb/Monat existiert nicht: leer merken
         except (requests.RequestException, ValueError):
             pass
         time.sleep(1.5 * (attempt + 1))
@@ -83,6 +83,12 @@ def _months(start: tuple[int, int], end: datetime) -> list[str]:
     return out
 
 
+def _dead_slug(slug: str) -> bool:
+    """True, wenn ESPN für diesen Wettbewerb in keinem gespeicherten Monat Spiele hatte."""
+    files = list(CACHE.glob(f"{slug}_*.json"))
+    return len(files) >= 6 and all(f.stat().st_size <= 2 for f in files)
+
+
 def load(slugs: list[str], start: tuple[int, int], now: datetime, log=print) -> list[dict]:
     """Alle Spiele der Wettbewerbe ab start bis einen Monat nach heute."""
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -96,6 +102,9 @@ def load(slugs: list[str], start: tuple[int, int], now: datetime, log=print) -> 
             final = month_end < now - timedelta(days=5)  # Monat sicher abgeschlossen
             if final and f.exists():
                 events += json.loads(f.read_text())
+            elif not final and _dead_slug(slug) and f.exists() and \
+                    datetime.fromtimestamp(f.stat().st_mtime, timezone.utc) > now - timedelta(days=7):
+                continue   # Wettbewerb ohne Daten bei ESPN: nur wöchentlich neu prüfen
             else:
                 jobs.append((slug, ym, f, final))
 
@@ -112,8 +121,8 @@ def load(slugs: list[str], start: tuple[int, int], now: datetime, log=print) -> 
                     events += json.loads(f.read_text())
                 continue
             events += evs
-            if final or evs:
-                f.write_text(json.dumps(evs, separators=(",", ":")))
+            f.write_text(json.dumps(evs, separators=(",", ":")))
+
     log(f"ESPN: {len(jobs)} Abfragen, {missing} ohne Daten, {len(events)} Spiele gesamt")
 
     seen, out = set(), []

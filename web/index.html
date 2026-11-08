@@ -350,6 +350,7 @@ form.sim { display: grid; gap: 14px; }
 .checks { display: flex; flex-wrap: wrap; gap: 6px; }
 .btn { appearance: none; border: 0; border-radius: var(--radius); background: var(--home); color: var(--surface); font: 700 17px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: 13px 16px; cursor: pointer; }
 .btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .55; cursor: progress; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
 .kpi dt { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
@@ -368,6 +369,29 @@ form.sim { display: grid; gap: 14px; }
 .status.lost { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
 .status.open, .status.void { background: var(--sunken); color: var(--muted); }
 .status.exact { background: var(--good); color: var(--surface); }
+
+/* ---------- Modell-Panel ---------- */
+.model-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .model-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .model-grid > * + * { border-left: 1px solid var(--line); } }
+@media (max-width: 899px) { .model-grid > * + * { border-top: 1px solid var(--line); } }
+.run-status { font-size: 13.5px; min-height: 1.4em; }
+.run-status .live { margin-right: 6px; }
+.gh-key summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.fact { background: var(--sunken); border-radius: 4px; padding: 8px 10px; }
+.fact dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.fact dd { margin: 2px 0 0; font: 700 20px/1.1 var(--font-display); }
+.fact dd small { font: 500 11.5px/1.3 var(--font-body); color: var(--muted); display: block; }
+.feeds { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.feeds li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+.feeds li b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.home-adv { display: grid; gap: 6px; margin-top: 8px; font-size: 13px; }
+.home-adv div { display: grid; grid-template-columns: minmax(0, 1fr) 90px 42px; gap: 8px; align-items: center; }
+.home-adv i { display: block; height: 6px; background: var(--home); border-radius: 2px; }
+.mix { display: grid; grid-template-columns: auto repeat(3, 1fr); gap: 2px 10px; font-size: 12.5px; color: var(--muted); }
+.mix b { color: var(--ink); font-weight: 600; text-align: right; }
+.mix span:not(:first-child) { text-align: right; }
+.mix .hd { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 
 /* ---------- Einstellungen ---------- */
 .settings { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
@@ -463,6 +487,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
             <div class="seg" id="s-mode"><button type="button" data-v="fix">Fix CHF</button><button type="button" data-v="percent" aria-pressed="true">% vom Konto</button><button type="button" data-v="kelly">Kelly</button></div>
           </div>
           <div class="field" id="s-stake-f"><label for="s-stake" id="s-stake-l">Prozent pro Tipp</label><input class="input" id="s-stake" type="number" min="0.01" step="any" inputmode="decimal" value="2"></div>
+          <div class="field"><span class="lbl" data-tip="Kombiniert = Modell und Marktquoten gemischt, so wie die App heute tippt. Nur Modell zeigt, was das reine Modell gebracht hätte.">Prognose</span>
+            <div class="seg" id="s-mix"><button type="button" data-v="mix" aria-pressed="true">Modell + Markt</button><button type="button" data-v="model" aria-pressed="false">Nur Modell</button></div>
+          </div>
           <div class="field"><span class="lbl">Wettarten (mehrere möglich)</span>
             <div class="checks" id="s-legs"><button type="button" class="chip" data-v="1" aria-pressed="true">Einzeltipps</button><button type="button" class="chip" data-v="2" aria-pressed="false">2er-Kombi</button><button type="button" class="chip" data-v="3" aria-pressed="false">3er-Kombi</button><button type="button" class="chip" data-v="4" aria-pressed="false">4er-Kombi</button></div>
           </div>
@@ -494,6 +521,43 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-einstellungen" hidden>
+    <div class="panel" id="model-panel" style="margin-bottom:16px">
+      <div class="panel-h"><h3>Modell</h3><span class="muted" style="font-size:12.5px" id="mdl-stamp"></span></div>
+      <div class="model-grid">
+        <div class="panel-b" style="display:grid;gap:12px">
+          <div class="checks" id="run-opts">
+            <button type="button" class="chip" data-o="notify" aria-pressed="false">Telegram-Nachricht senden</button>
+            <button type="button" class="chip" data-o="refresh_odds" aria-pressed="false">Quoten neu laden</button>
+            <button type="button" class="chip" data-o="retune" aria-pressed="false">Einstellungen neu optimieren</button>
+          </div>
+          <button class="btn" type="button" id="run-btn">Modell jetzt neu rechnen</button>
+          <div id="run-status" class="run-status" aria-live="polite"></div>
+          <details class="gh-key" id="gh-key">
+            <summary>GitHub-Schlüssel für den Knopf <span class="muted" id="gh-key-state"></span></summary>
+            <div style="display:grid;gap:8px;margin-top:10px">
+              <p class="note" style="margin:0">Der Knopf startet den Lauf direkt auf GitHub. Dafür braucht die App einmalig einen Schlüssel, der nur auf diesem Gerät gespeichert wird.</p>
+              <ol class="note" style="margin:0;padding-left:18px">
+                <li>Auf GitHub: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" style="color:inherit">Settings → Developer settings → Fine-grained tokens → Generate</a></li>
+                <li>Name «GoalOracle», Ablauf z. B. 1 Jahr</li>
+                <li>Repository access: <b>Only select repositories</b> → goaloracle</li>
+                <li>Permissions → Repository → <b>Actions: Read and write</b></li>
+                <li>Erstellen, Schlüssel kopieren und hier einfügen</li>
+              </ol>
+              <div class="row2" style="grid-template-columns:1fr auto">
+                <input class="input" id="gh-token" type="password" autocomplete="off" placeholder="github_pat_…" aria-label="GitHub-Schlüssel">
+                <button type="button" class="chip" id="gh-save" aria-pressed="false">Speichern</button>
+              </div>
+              <button type="button" class="chip" id="gh-forget" aria-pressed="false" hidden>Schlüssel von diesem Gerät löschen</button>
+            </div>
+          </details>
+        </div>
+        <div class="panel-b" id="mdl-facts"></div>
+      </div>
+      <div class="model-grid" style="border-top:1px solid var(--line)">
+        <div class="panel-b"><span class="lbl">Datenquellen</span><ul class="feeds" id="mdl-feeds"></ul></div>
+        <div class="panel-b"><span class="lbl" data-tip="Wie viel mehr Tore ein Heimteam im Schnitt schiesst. 1.25 heisst 25 % mehr als auf neutralem Platz.">Heimvorteil je Wettbewerb</span><div id="mdl-home" class="home-adv"></div></div>
+      </div>
+    </div>
     <div class="settings">
       <div class="panel"><div class="panel-h"><h3>Tipp-Arten</h3><span class="muted" style="font-size:12.5px">für Vorschläge und Kombis</span></div><div id="set-markets"></div></div>
       <div class="panel"><div class="panel-h"><h3>Wettbewerbe</h3></div><div id="set-comps"></div></div>
@@ -911,6 +975,12 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
           <div class="bar"><i class="h" style="width:${u.p[0] * 100}%"></i><i class="d" style="width:${u.p[1] * 100}%"></i><i class="a" style="width:${u.p[2] * 100}%"></i></div>
           <div class="legend"><span>1 <b>${pct(u.p[0])}</b></span><span>X <b>${pct(u.p[1])}</b></span><span>2 <b>${pct(u.p[2])}</b></span></div>
         </div>
+        ${u.p_market ? `<div class="mix" aria-label="Modell und Markt">
+          <span class="hd"></span><span class="hd">1</span><span class="hd">X</span><span class="hd">2</span>
+          <span data-tip="Reines GoalOracle-Modell aus Toren${u.sot ? " und Schüssen aufs Tor" : ""}.">Modell</span><span>${pct(u.p_model[0])}</span><span>${pct(u.p_model[1])}</span><span>${pct(u.p_model[2])}</span>
+          <span data-tip="Aus den Buchmacher-Quoten, Marge herausgerechnet.">Markt</span><span>${pct(u.p_market[0])}</span><span>${pct(u.p_market[1])}</span><span>${pct(u.p_market[2])}</span>
+          <span data-tip="Gewichteter Mix. Der Anteil wird im Rückblick optimiert.">Prognose</span><b>${pct(u.p[0])}</b><b>${pct(u.p[1])}</b><b>${pct(u.p[2])}</b>
+        </div>` : ""}
         <dl class="stats">
           <div class="stat"><dt data-tip="Erwartete Tore: So viele Tore erwartet das Modell für Heim und Gast.">xG</dt><dd>${u.xg[0].toFixed(1)} – ${u.xg[1].toFixed(1)}</dd></div>
           <div class="stat"><dt data-tip="Chance auf 3 oder mehr Tore im Spiel.">Über 2.5</dt><dd>${pct(u.m["O2.5"])}</dd></div>
@@ -1169,6 +1239,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     simReady = true;
     $("#s-leagues").innerHTML = ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1"].map((k) => `<button type="button" class="chip" data-v="${k}" aria-pressed="true">${esc(compName(k, true))}</button>`).join("");
     toggleChips($("#s-leagues")); toggleChips($("#s-markets"));
+    segInit($("#s-mix"), simState.mix || "mix");
     segInit($("#s-risk"), simState.risk || "ausgewogen", (v) => ($("#s-risk-note").textContent = riskNote(v)));
     $("#s-risk-note").textContent = riskNote(simState.risk || "ausgewogen");
     const stakeLbl = { fix: ["CHF pro Tipp", 10], percent: ["Prozent vom Konto pro Tipp", 2], kelly: ["Kelly-Anteil (0.1 bis 1)", 0.25] };
@@ -1200,16 +1271,23 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   function runSim() {
     if (!sim || !sim.rows.length) return;
     const num = (id, d) => { const v = parseFloat(String($(id).value).replace(",", ".")); return Number.isFinite(v) && v > 0 ? v : d; };
-    const cfg = { budget: num("#s-budget", 500), risk: segVal($("#s-risk")),
+    const cfg = { budget: num("#s-budget", 500), risk: segVal($("#s-risk")), mix: segVal($("#s-mix")),
       mode: segVal($("#s-mode")), stake: num("#s-stake", 1), legs: onChips($("#s-legs")).map(Number).sort(), max: Math.round(num("#s-max", 6)),
       from: $("#s-from").value, markets: onChips($("#s-markets")), leagues: onChips($("#s-leagues")) };
-    store.set("go-sim", { budget: cfg.budget, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
+    store.set("go-sim", { budget: cfg.budget, mix: cfg.mix, risk: cfg.risk, mode: cfg.mode, stake: cfg.stake, legs: cfg.legs, max: cfg.max, from: cfg.from });
     const R = data.risk[cfg.risk];
     // Zeile: [datum, liga, heim, gast, p1, pX, p2, pO, pU, o1, oX, o2, oO, oU, tore heim, tore gast]
     const byDay = new Map();
-    for (const r of sim.rows) {
+    for (let r of sim.rows) {
       if (r[0] < cfg.from || !cfg.leagues.includes(r[1])) continue;
       const [hg, ag] = [r[14], r[15]];
+      if (cfg.mix === "mix") {   // Modell und Markt mischen, wie in der App heute
+        const w = sim.w ?? 0.5, wo = sim.w_ou ?? 0.5;
+        const i1 = 1 / r[9], ix = 1 / r[10], i2 = 1 / r[11], s3 = i1 + ix + i2;
+        r = r.slice();
+        r[4] = w * r[4] + (1 - w) * i1 / s3; r[5] = w * r[5] + (1 - w) * ix / s3; r[6] = w * r[6] + (1 - w) * i2 / s3;
+        if (r[12] && r[13]) { const io = 1 / r[12], iu = 1 / r[13]; r[7] = wo * r[7] + (1 - wo) * io / (io + iu); r[8] = 1 - r[7]; }
+      }
       const cands = [];
       if (cfg.markets.includes("1x2")) [["1", 4, 9, hg > ag], ["X", 5, 10, hg === ag], ["2", 6, 11, hg < ag]].forEach(([k, pi, oi, win]) => cands.push({ k, p: r[pi], o: r[oi], win }));
       if (cfg.markets.includes("ou")) [["O2.5", 7, 12, hg + ag > 2.5], ["U2.5", 8, 13, hg + ag < 2.5]].forEach(([k, pi, oi, win]) => cands.push({ k, p: r[pi], o: r[oi], win }));
@@ -1264,7 +1342,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <div class="panel"><div class="panel-h"><h3>Letzte Wetten</h3></div><div class="table-wrap"><table class="rank"><thead><tr><th>Datum</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>
         ${log.slice(-15).reverse().map((x) => `<tr><td class="muted">${fDate.format(new Date(x.day))}</td><td>${x.b.legs.map((l) => `${esc(l.match)} <b>${esc(l.k.replace("O2.5", "Ü2.5"))}</b>`).join("<br>")}</td><td class="num">${x.b.odds.toFixed(2)}</td><td class="num">${chf(x.s)}</td><td><span class="status ${x.pay ? "won" : "lost"}">${x.pay ? "+" + chf(x.pay - x.s) : "−" + chf(x.s)}</span></td></tr>`).join("")}
       </tbody></table></div></div>
-      <p class="note">Simuliert mit den damaligen Marktquoten (Buchmacher-Durchschnitt) und Prognosen, die nur Daten vor der jeweiligen Spielwoche kannten. Vergangene Ergebnisse garantieren nichts für die Zukunft.</p>`;
+      <p class="note">${cfg.mix === "mix" ? `Prognose: ${pct(sim.w ?? 0.5)} Modell, ${pct(1 - (sim.w ?? 0.5))} Markt. ` : "Prognose: nur Modell. "}Simuliert mit den damaligen Marktquoten (Buchmacher-Durchschnitt) und Prognosen, die nur Daten vor der jeweiligen Spielwoche kannten. Vergangene Ergebnisse garantieren nichts für die Zukunft.</p>`;
   }
   function chart(curve, start) {
     const W = 640, H = 220, P = { l: 52, r: 14, t: 12, b: 26 };
@@ -1383,6 +1461,114 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); renderTipps(); });
   $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); renderTipps(); });
 
+  // ---------- Modell-Panel: Kennzahlen, Datenquellen, manueller Lauf ----------
+  const GH = (() => {
+    const repo = (data && data.repo) || "";
+    if (repo.includes("/")) return { owner: repo.split("/")[0], repo: repo.split("/")[1] };
+    const host = location.hostname, seg = location.pathname.split("/").filter(Boolean)[0];
+    if (host.endsWith(".github.io") && seg) return { owner: host.split(".")[0], repo: seg };
+    return null;
+  });
+  const ghToken = () => { try { return localStorage.getItem("go-gh-token") || ""; } catch (e) { return ""; } };
+  const runOpts = Object.assign({ notify: false, refresh_odds: false, retune: false }, store.get("go-run") || {});
+
+  function renderModel() {
+    const M = data.model || {}, P = M.params || {}, X = P.metrics || {}, F = M.feeds || {};
+    $("#mdl-stamp").textContent = "Zuletzt gerechnet: " + fStamp.format(new Date(data.generated));
+    const hl = P.xi ? Math.round(Math.log(2) / P.xi) : null;
+    const fact = (t, v, sub, tip) => `<div class="fact"><dt${tip ? ` data-tip="${esc(tip)}"` : ""}>${t}</dt><dd>${v}${sub ? `<small>${sub}</small>` : ""}</dd></div>`;
+    const ll = (v) => (v != null ? v.toFixed(3) : "–");
+    $("#mdl-facts").innerHTML = `<dl class="facts">
+      ${fact("Trefferquote 1X2", X.hit_blend != null ? pct(X.hit_blend) : "–", X.n ? `Rückblick, ${X.n} Spiele` : "noch nicht optimiert", "Wie oft der wahrscheinlichste Ausgang im Rückblick eingetreten ist (Modell und Markt kombiniert).")}
+      ${fact("Log-Loss Modell", ll(X.ll_model), `Markt ${ll(X.ll_market)} · Mix ${ll(X.ll_blend)}`, "Misst, wie gut die Wahrscheinlichkeiten stimmen. Je tiefer, desto besser. Raten ergibt 1.099.")}
+      ${fact("Modell-Anteil", P.w != null ? pct(P.w) : "–", `Rest: Marktquoten · Ü/U ${P.w_ou != null ? pct(P.w_ou) : "–"}`, "So stark zählt das eigene Modell, wenn Marktquoten vorliegen. Der Wert wird im Rückblick optimiert.")}
+      ${fact("Schuss-Anteil", P.beta != null ? pct(P.beta) : "–", "Schüsse aufs Tor vs. Tore", "Wie stark die Schüsse aufs Tor in die erwarteten Tore einfliessen. Schüsse schwanken weniger als Tore.")}
+      ${fact("Halbwertszeit", hl ? hl + " Tage" : "–", "so schnell verlieren alte Spiele Gewicht", "Ein Spiel von vor dieser Anzahl Tagen zählt noch halb so viel wie ein Spiel von heute.")}
+      ${fact("Optimiert", P.tuned_at ? fDate.format(new Date(P.tuned_at)) : "–", "jeden Montag automatisch")}
+    </dl>`;
+    const feeds = [
+      ["Resultate & Spielpläne (ESPN)", `${(F.espn_matches || 0).toLocaleString("de-CH")} Spiele · ${F.espn_comps || 0} Wettbewerbe`],
+      ["Clubs im Modell", `${(M.club_teams || 0).toLocaleString("de-CH")} Teams`],
+      ["Nationalteams", `${M.nation_teams || 0} Teams`],
+      ["Schüsse, Ecken, Karten, alte Quoten (football-data.co.uk)", `${(F.fdco_matches || 0).toLocaleString("de-CH")} Spiele`],
+      ["Schüsse aufs Tor im Modell", `${(M.sot_matches || 0).toLocaleString("de-CH")} Spiele · ${M.conv ? Math.round(M.conv * 100) + " % Torquote" : ""}`],
+      ["Live-Quoten (The Odds API)", data.odds.key ? `${data.odds.matches} Spiele · ${data.odds.credits ?? "?"} Credits übrig` : "kein Key"],
+    ];
+    $("#mdl-feeds").innerHTML = feeds.map(([a, b]) => `<li><span>${esc(a)}</span><b>${esc(b)}</b></li>`).join("");
+    const ch = Object.entries(M.comp_home || {}).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1.6, ...ch.map((x) => x[1]));
+    $("#mdl-home").innerHTML = ch.length ? ch.map(([k, v]) => `<div><span>${esc(compName(k))}</span><i style="width:${Math.max(4, (v - 0.8) / (max - 0.8) * 90)}px"></i><b>${v.toFixed(2)}×</b></div>`).join("")
+      : `<span class="muted">Nach dem nächsten Lauf verfügbar.</span>`;
+    $$("#run-opts .chip").forEach((b) => b.setAttribute("aria-pressed", String(!!runOpts[b.dataset.o])));
+    const has = !!ghToken();
+    $("#gh-key-state").textContent = has ? "· gespeichert" : "· fehlt";
+    $("#gh-forget").hidden = !has;
+    $("#run-btn").textContent = has ? "Modell jetzt neu rechnen" : "Auf GitHub neu rechnen";
+  }
+  $("#run-opts").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; runOpts[b.dataset.o] = !runOpts[b.dataset.o]; store.set("go-run", runOpts); renderModel(); });
+  $("#gh-save").addEventListener("click", () => { const v = $("#gh-token").value.trim(); if (!v) return; try { localStorage.setItem("go-gh-token", v); } catch (e) { /* egal */ } $("#gh-token").value = ""; renderModel(); $("#run-status").textContent = "Schlüssel gespeichert."; });
+  $("#gh-forget").addEventListener("click", () => { try { localStorage.removeItem("go-gh-token"); } catch (e) { /* egal */ } renderModel(); $("#run-status").textContent = "Schlüssel gelöscht."; });
+
+  let pollT = null;
+  function setRunStatus(html) { $("#run-status").innerHTML = html; }
+  async function ghFetch(path, opts = {}) {
+    const g = GH(); if (!g) throw new Error("repo");
+    const headers = { Accept: "application/vnd.github+json" };
+    const t = ghToken(); if (t) headers.Authorization = "Bearer " + t;
+    return fetch(`https://api.github.com/repos/${g.owner}/${g.repo}${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+  }
+  $("#run-btn").addEventListener("click", async () => {
+    const g = GH();
+    if (!ghToken()) {
+      if (g) { const a = document.createElement("a"); a.href = `https://github.com/${g.owner}/${g.repo}/actions/workflows/daily.yml`; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+      setRunStatus(g ? `Auf GitHub: <b>Run workflow</b> antippen. Mit einem gespeicherten Schlüssel geht es direkt hier.` : "Repository unbekannt.");
+      return;
+    }
+    $("#run-btn").disabled = true;
+    setRunStatus("Lauf wird gestartet …");
+    try {
+      const started = Date.now();
+      const r = await ghFetch("/actions/workflows/daily.yml/dispatches", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: "main", inputs: { notify: String(runOpts.notify), refresh_odds: String(runOpts.refresh_odds), retune: String(runOpts.retune) } }) });
+      if (r.status === 401 || r.status === 403) throw new Error("Der Schlüssel wurde abgelehnt. Prüf, ob er für goaloracle gilt und «Actions: Read and write» hat.");
+      if (!r.ok) throw new Error("GitHub antwortet mit Fehler " + r.status + ".");
+      pollRun(started);
+    } catch (e) {
+      setRunStatus(`<span class="neg-d">${esc(e.message || "Start fehlgeschlagen.")}</span>`);
+      $("#run-btn").disabled = false;
+    }
+  });
+  function pollRun(started) {
+    clearTimeout(pollT);
+    const tick = async () => {
+      try {
+        const r = await ghFetch("/actions/workflows/daily.yml/runs?per_page=1&event=workflow_dispatch");
+        const j = await r.json(), run = (j.workflow_runs || [])[0];
+        const mine = run && new Date(run.created_at).getTime() >= started - 60e3;
+        const secs = Math.round((Date.now() - started) / 1000), mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, "0");
+        if (!mine || run.status !== "completed") {
+          setRunStatus(`<span class="live">Läuft</span> ${mm}:${ss} · ${runOpts.retune ? "mit Optimierung 5–10 Minuten" : "meist 2–4 Minuten"}${run && mine ? ` · <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">auf GitHub ansehen</a>` : ""}`);
+          pollT = setTimeout(tick, 8000); return;
+        }
+        if (run.conclusion !== "success") { setRunStatus(`<span class="neg-d">Lauf fehlgeschlagen.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`); $("#run-btn").disabled = false; return; }
+        setRunStatus("Fertig. Neue Daten werden geladen …");
+        setTimeout(reloadData, 15000);
+      } catch (e) { pollT = setTimeout(tick, 10000); }
+    };
+    tick();
+  }
+  async function reloadData() {
+    try {
+      const [d, p] = await Promise.all([
+        fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((r) => r.json()),
+        fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+      data = d; paper = p; history = null; sim = null; simReady = false;
+      render();
+      setRunStatus(`<span class="pos-d">Aktualisiert</span> · Stand ${esc(fStamp.format(new Date(data.generated)))}`);
+    } catch (e) { setRunStatus("Fertig. Lade die Seite neu, um die neuen Daten zu sehen."); }
+    $("#run-btn").disabled = false;
+  }
+
   // ---------- Info-Blasen (Hover am Computer, Antippen am Handy) ----------
   const tipbox = document.createElement("div");
   tipbox.className = "tipbox"; tipbox.setAttribute("role", "tooltip"); document.body.appendChild(tipbox);
@@ -1431,7 +1617,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (!data.odds.key) notes.push("<b>Noch ohne Marktquoten.</b> Tipps werden nach Wahrscheinlichkeit sortiert. Mit einem Odds-API-Key erkennt GoalOracle auch Value.");
     $("#notice").innerHTML = notes.join(" "); $("#notice").hidden = !notes.length;
     $("#model-note").textContent = `Modell: Dixon-Coles über ${data.model.club_teams} Clubs und ${data.model.club_matches.toLocaleString("de-CH")} Spiele, Heimvorteil ${data.model.home_adv.toFixed(2)}×. Wappen und Spielpläne: ESPN. Quoten: The Odds API, historisch football-data.co.uk.`;
-    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps();
+    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps(); renderModel();
     route();
   }
   function fail() {

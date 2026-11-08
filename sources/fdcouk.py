@@ -74,6 +74,7 @@ def fetch(codes: list[str], seasons: list[int], current: int, log=print) -> dict
                     "hg": int(float(row["FTHG"])), "ag": int(float(row["FTAG"])),
                     "hc": _num(row.get("HC")), "ac": _num(row.get("AC")),
                     "hy": _num(row.get("HY")), "ay": _num(row.get("AY")),
+                    "hst": _num(row.get("HST")), "ast": _num(row.get("AST")),
                     "o1": _num(row.get("AvgH")) or _num(row.get("B365H")),
                     "oX": _num(row.get("AvgD")) or _num(row.get("B365D")),
                     "o2": _num(row.get("AvgA")) or _num(row.get("B365A")),
@@ -133,7 +134,8 @@ def attach(rows_by_code: dict[str, list[dict]], events: list[dict], code_to_slug
             hid, aid = name_to_id.get(row["home"]), name_to_id.get(row["away"])
             for e in cands:
                 if e["home"]["id"] == hid and e["away"]["id"] == aid:
-                    e["fd"] = {k: row[k] for k in ("hc", "ac", "hy", "ay", "o1", "oX", "o2", "oO25", "oU25")}
+                    e["fd"] = {k: row[k] for k in ("hc", "ac", "hy", "ay", "hst", "ast",
+                                                   "o1", "oX", "o2", "oO25", "oU25")}
                     attached += 1
                     break
     return attached

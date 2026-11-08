@@ -20,13 +20,18 @@ DISPLAY = {
 }
 
 # Zusätzliche Wettbewerbe nur fürs Training (machen Teams vergleichbar)
+# Unterbau der Top-5 (wichtig für Pokale) und weitere europäische Ligen (wichtig für Europacups).
+# Kürzel, die ESPN nicht kennt, kosten nur beim ersten Lauf eine Abfrage pro Monat und werden dann übersprungen.
 TRAIN_CLUB_LEAGUES = [
-    "eng.2", "eng.3", "eng.4", "ger.2", "ita.2", "esp.2", "fra.2",
-    "ned.1", "por.1", "bel.1", "sco.1", "tur.1", "aut.1", "sui.1", "gre.1", "den.1",
+    "eng.2", "eng.3", "eng.4", "eng.5", "ger.2", "ger.3", "ita.2", "ita.3", "esp.2", "fra.2", "fra.3",
+    "ned.1", "ned.2", "por.1", "por.2", "bel.1", "bel.2", "sco.1", "sco.2", "tur.1", "aut.1", "sui.1", "sui.2",
+    "gre.1", "den.1", "nor.1", "swe.1", "pol.1", "cze.1", "cro.1", "srb.1", "ukr.1", "rou.1", "isr.1",
+    "cyp.1", "hun.1", "svk.1", "svn.1", "bul.1", "irl.1", "fin.1", "isl.1", "kaz.1", "aze.1", "geo.1",
 ]
 TRAIN_NATION = [
     "fifa.friendly", "fifa.worldq.uefa", "uefa.euroq", "uefa.euro", "fifa.world",
-    "fifa.worldq.conmebol", "fifa.worldq.concacaf", "fifa.worldq.caf", "fifa.worldq.afc",
+    "fifa.worldq.conmebol", "fifa.worldq.concacaf", "fifa.worldq.caf", "fifa.worldq.afc", "fifa.worldq.ofc",
+    "concacaf.nations.league", "concacaf.gold", "conmebol.america", "caf.nations", "afc.asian.cup",
 ]
 
 # Namen der Trainings-Wettbewerbe (für die Form-Anzeige)
@@ -37,7 +42,17 @@ OTHER_NAMES = {
     "sui.1": "Super League", "gre.1": "Super League GR", "den.1": "Superliga", "fifa.friendly": "Testspiel",
     "fifa.worldq.uefa": "WM-Quali", "uefa.euroq": "EM-Quali", "uefa.euro": "EM", "fifa.world": "WM",
     "fifa.worldq.conmebol": "WM-Quali", "fifa.worldq.concacaf": "WM-Quali", "fifa.worldq.caf": "WM-Quali",
-    "fifa.worldq.afc": "WM-Quali",
+    "fifa.worldq.afc": "WM-Quali", "fifa.worldq.ofc": "WM-Quali", "eng.5": "National League",
+    "ger.3": "3. Liga", "ita.3": "Serie C", "fra.3": "National", "ned.2": "Eerste Divisie",
+    "por.2": "Liga Portugal 2", "bel.2": "Challenger Pro League", "sco.2": "Championship SCO",
+    "sui.2": "Challenge League", "nor.1": "Eliteserien", "swe.1": "Allsvenskan", "pol.1": "Ekstraklasa",
+    "cze.1": "Chance Liga", "cro.1": "HNL", "srb.1": "Superliga SRB", "ukr.1": "Premier Liga UKR",
+    "rou.1": "Liga 1 ROU", "isr.1": "Ligat ha'Al", "cyp.1": "First Division CYP", "hun.1": "NB I",
+    "svk.1": "Niké Liga", "svn.1": "PrvaLiga", "bul.1": "First League BUL", "irl.1": "League of Ireland",
+    "fin.1": "Veikkausliiga", "isl.1": "Besta deild", "kaz.1": "Premier League KAZ", "aze.1": "Premyer Liqa",
+    "geo.1": "Erovnuli Liga", "concacaf.nations.league": "Nations League CONCACAF",
+    "concacaf.gold": "Gold Cup", "conmebol.america": "Copa América", "caf.nations": "Afrika-Cup",
+    "afc.asian.cup": "Asienmeisterschaft",
 }
 
 # Ligen (nicht Pokale): Teams darin bekommen kein "schwach"-Vorwissen
@@ -49,7 +64,8 @@ FDCO_MAP = {
     "E0": "eng.1", "E1": "eng.2", "E2": "eng.3", "E3": "eng.4",
     "D1": "ger.1", "D2": "ger.2", "I1": "ita.1", "I2": "ita.2",
     "SP1": "esp.1", "SP2": "esp.2", "F1": "fra.1", "F2": "fra.2",
-    "N1": "ned.1", "P1": "por.1", "B1": "bel.1", "SC0": "sco.1", "T1": "tur.1", "G1": "gre.1",
+    "N1": "ned.1", "P1": "por.1", "B1": "bel.1", "SC0": "sco.1", "SC1": "sco.2", "T1": "tur.1",
+    "G1": "gre.1", "EC": "eng.5",
 }
 
 # The Odds API: ESPN-Kürzel -> mögliche Sport-Schlüssel (nur aktive werden genutzt)

@@ -11,7 +11,7 @@ import html
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -19,6 +19,8 @@ import requests
 
 import config as C
 import engine as E
+import tuning as T
+from predictor import Params, Predictor
 from sources import espn, fdcouk, oddsapi
 
 ROOT = Path(__file__).resolve().parent
@@ -96,9 +98,24 @@ def send_telegram(text, token, chat_id):
         raise RuntimeError(f"Telegram-Fehler {r.status_code}: {r.text}")
 
 
+def wait_until(hhmm: str, max_minutes: int = 45):
+    """Bis zur gewünschten Schweizer Uhrzeit warten (z. B. 10:00), höchstens max_minutes."""
+    import time
+    h, m = map(int, hhmm.split(":"))
+    now = datetime.now(TZ)
+    target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    wait = (target - now).total_seconds()
+    if 0 < wait <= max_minutes * 60:
+        print(f"Warte {wait / 60:.1f} Minuten bis {hhmm} Uhr …")
+        time.sleep(wait)
+
+
 def main():
     ap = argparse.ArgumentParser(description="GoalOracle")
-    ap.add_argument("--no-telegram", action="store_true")
+    ap.add_argument("--notify", action="store_true", help="Top-Tipps an Telegram senden")
+    ap.add_argument("--send-at", metavar="HH:MM", help="Telegram erst zu dieser Schweizer Uhrzeit senden")
+    ap.add_argument("--refresh-odds", action="store_true", help="Quoten sicher neu laden (kostet Credits)")
+    ap.add_argument("--retune", action="store_true", help="Modell-Einstellungen neu optimieren (dauert einige Minuten)")
     ap.add_argument("--dry-run", action="store_true", help="Telegram-Text nur anzeigen")
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
     args = ap.parse_args()
@@ -108,47 +125,73 @@ def main():
     slugs = list(C.DISPLAY) + C.TRAIN_CLUB_LEAGUES + C.TRAIN_NATION
     events = espn.load(slugs, C.HISTORY_START, now)
     rows = fdcouk.fetch(list(C.FDCO_MAP), [season - 2, season - 1, season], season)
-    n = fdcouk.attach(rows, events, C.FDCO_MAP)
-    print(f"Quoten/Ecken zugeordnet: {n} Spiele")
+    n_fd = fdcouk.attach(rows, events, C.FDCO_MAP)
+    print(f"football-data.co.uk zugeordnet: {n_fd} Spiele")
 
-    models = E.fit_models(events, now)
+    # Modell-Einstellungen: gespeichert oder neu optimieren
+    tuning_f = ROOT / "cache" / "tuning.json"
+    params = Params.from_dict(load_json(tuning_f, None))
+    tuned_rows = None
+    if args.retune or not params.tuned_at:
+        params, tuned_rows = T.tune(events, now)
+        if params.tuned_at:
+            write_json(tuning_f, params.to_dict())
+    print(f"Einstellungen: xi={params.xi}, Schuss-Anteil={params.beta}, Modell-Anteil 1X2={params.w}, Ü/U={params.w_ou}")
+
+    pr = Predictor(params).fit(events, now, log=print)
     info = E.team_info(events)
     fdet = E.form_details(events)
     form = E.form_of(events, now, fdet)
     by_id = {e["id"]: e for e in events}
 
-    odds, credits = {}, None
+    # Quoten: neu laden höchstens alle 6 Stunden, ausser ausdrücklich gewünscht
+    prev = load_json(WEB / "data.json", {})
+    prev_odds = prev.get("odds", {})
+    odds, credits, fetched = {}, prev_odds.get("credits"), prev_odds.get("fetched")
     key = os.getenv("ODDS_API_KEY")
-    if key:
+    stale = not fetched or (now - datetime.fromisoformat(fetched)) > timedelta(hours=6)
+    if key and (args.refresh_odds or stale):
         soon = [{**e, "dt": E.parse_date(e["date"])} for e in events
                 if e["slug"] in C.DISPLAY and not e["completed"] and e["status"] not in espn.DEAD]
         soon = [e for e in soon if e["dt"] > now]
-        odds, credits = oddsapi.fetch(key, C.ODDS_KEYS, soon, now, C.ODDS_DAYS_AHEAD, C.ODDS_MIN_CREDITS)
-    prev = load_json(WEB / "data.json", {})
-    # Quoten vom Vortag behalten, wenn heute keine neuen geholt wurden
-    for u in prev.get("upcoming", []):
+        odds, c = oddsapi.fetch(key, C.ODDS_KEYS, soon, now, C.ODDS_DAYS_AHEAD, C.ODDS_MIN_CREDITS)
+        credits = c if c is not None else credits
+        fetched = now.isoformat()
+    elif key:
+        print("Quoten: letzte Abfrage jünger als 6 Stunden, verwende gespeicherte Quoten")
+    for u in prev.get("upcoming", []):      # bekannte Quoten behalten
         if u.get("odds") and u["id"] not in odds:
             odds[u["id"]] = u["odds"]
 
-    upcoming = E.build_upcoming(models, events, info, form, odds, now)
+    upcoming = E.build_upcoming(pr, events, info, form, odds, now)
     prev_hist = load_json(WEB / "history.json", {}).get("history") or prev.get("history", [])
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
-    rankings = E.build_rankings(models, events, info, form, now)
+    rankings = E.build_rankings(pr, events, info, form, now)
 
+    slugs_with_data = {e["slug"] for e in events if e["completed"]}
     data = {
         "generated": now.isoformat(),
+        "repo": os.getenv("GITHUB_REPOSITORY", ""),
         "comps": {k: {"name": v[0], "short": v[1], "type": v[2]} for k, v in C.DISPLAY.items()},
         "risk": C.RISK, "days_ahead": C.DAYS_AHEAD,
-        "odds": {"key": bool(key), "credits": credits, "matches": sum(1 for u in upcoming if u["odds"])},
-        "model": {"club_teams": len(models.club.teams), "club_matches": models.club.n_matches,
-                  "home_adv": round(2.718281828 ** models.club.home_adv, 2),
-                  "corners": bool(models.corners)},
+        "odds": {"key": bool(key), "credits": credits, "fetched": fetched,
+                 "matches": sum(1 for u in upcoming if u["odds"])},
+        "model": {
+            "club_teams": len(pr.goals.teams), "club_matches": pr.goals.n_matches,
+            "home_adv": round(2.718281828 ** pr.goals.home_adv, 2),
+            "comp_home": {k: round(2.718281828 ** (pr.goals.home_adv + v), 2) for k, v in pr.goals.comp_home.items()
+                          if k in C.DISPLAY},
+            "corners": bool(pr.corners), "nation_teams": len(pr.nation.teams) if pr.nation else 0,
+            "sot_matches": pr.sot.n_matches if pr.sot else 0, "conv": round(pr.conv, 3),
+            "params": params.to_dict(),
+            "feeds": {"espn_matches": sum(1 for e in events if e["completed"]),
+                      "espn_comps": len(slugs_with_data), "fdco_matches": n_fd},
+        },
         "upcoming": upcoming, "rankings": rankings,
         "history_summary": E.history_summary(history),
         "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
-    # Form-Details nur für Teams, die in der App vorkommen
     shown = {u[s]["id"] for u in upcoming for s in ("home", "away")} | \
             {r["team"]["id"] for rows in rankings.values() for r in rows}
     data["forms"] = {t: fdet[t] for t in shown if t in fdet}
@@ -158,11 +201,13 @@ def main():
     write_json(WEB / "paper.json", paper)
     write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
     if not args.skip_sim:
-        write_json(WEB / "sim.json", {"generated": now.isoformat(), "rows": E.build_sim(events, now)})
+        sim_rows = E.build_sim(events, now, params, tuned_rows)
+        write_json(WEB / "sim.json", {"generated": now.isoformat(), "w": params.w, "w_ou": params.w_ou,
+                                      "rows": sim_rows})
     print(f"Web-Daten: {len(upcoming)} Spiele, {len(history)} in der Bilanz, "
           f"Spielgeld {paper['balance']:.2f} CHF")
 
-    if args.no_telegram:
+    if not args.notify and not args.dry_run:
         return
     singles, legs = E.top_tips(upcoming, now)
     site = os.getenv("SITE_URL", "")
@@ -171,6 +216,8 @@ def main():
     if args.dry_run or not token or not chat:
         print(text)
         return
+    if args.send_at:
+        wait_until(args.send_at)
     send_telegram(text, token, chat)
     print("Telegram gesendet.")
 

@@ -4,11 +4,19 @@ Predict the game. Beat the gut feeling.
 
 Statistische Tipps für **Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League, Europa League, Conference League, Nations League** und die Pokale **FA Cup, League Cup, DFB-Pokal, Coppa Italia, Copa del Rey, Coupe de France**.
 
-Jeden Morgen um 8 Uhr:
-1. lädt der Bot alle Resultate und Spielpläne (ESPN), historische Quoten, Ecken und Karten (football-data.co.uk) und aktuelle Marktquoten (The Odds API),
-2. trainiert ein gemeinsames Dixon-Coles-Modell über rund 600 Clubs (Ligen, Pokale und Europacups zusammen, damit Teams aus verschiedenen Ländern vergleichbar sind) plus ein eigenes Modell für Nationalteams,
-3. berechnet für jedes Spiel alle Märkte und Kombis im selben Spiel exakt aus der Resultat-Matrix,
-4. schickt die Top-Tipps per Telegram, aktualisiert die Web-App und wettet im Spielgeld-Konto mit.
+Jeden Morgen um **10:00** kommt die Telegram-Nachricht. Dafür:
+1. lädt der Bot alle Resultate und Spielpläne aus über 60 Wettbewerben (ESPN), Schüsse aufs Tor, Ecken, Karten und historische Quoten (football-data.co.uk) und aktuelle Marktquoten (The Odds API),
+2. trainiert ein gemeinsames Dixon-Coles-Modell über alle Clubs, mit eigenem Heimvorteil je Wettbewerb und dem Niveau der eigenen Liga als Vorwissen, dazu ein Schuss-Modell, ein Modell für Nationalteams und Modelle für Ecken und Karten,
+3. mischt Modell und Marktquoten (Anteil wird per Rückblick optimiert) und berechnet daraus alle Märkte und Kombis exakt aus der Resultat-Matrix,
+4. aktualisiert die Web-App, wertet die Bilanz aus und wettet im Spielgeld-Konto mit.
+
+Jeden Montag früh optimiert sich das Modell selbst (Zeitgewichtung, Schuss-Anteil, Markt-Anteil) per Rückblick auf die letzten 15 Monate.
+
+## Manuell neu rechnen
+
+In der App unter **Einstellungen → Modell**: Optionen wählen (Telegram senden, Quoten neu laden, neu optimieren) und **Modell jetzt neu rechnen**. Dafür einmalig einen GitHub-Schlüssel (Fine-grained token, nur dieses Repo, Actions: Read and write) auf dem Gerät speichern. Ohne Schlüssel führt der Knopf zur GitHub-Seite mit **Run workflow**.
+
+Quoten werden bei manuellen Läufen nur neu geholt, wenn die letzte Abfrage älter als 6 Stunden ist oder du es ausdrücklich wählst. Das schont die 500 Gratis-Credits.
 
 ## Web-App
 
@@ -36,13 +44,14 @@ GitHub Pages: *Settings → Pages → Source: GitHub Actions*. Das Repo muss öf
 
 ## Anpassen
 
-Alles in `config.py`: Wettbewerbe, Risikoprofile, Regeln fürs Spielgeld-Konto (`PAPER`), wie viele Tage voraus Quoten geholt werden (spart Credits).
+Alles in `config.py`: Wettbewerbe, Trainings-Ligen, Risikoprofile, Regeln fürs Spielgeld-Konto (`PAPER`), wie viele Tage voraus Quoten geholt werden. Die Modell-Einstellungen stehen nach dem Optimieren in `cache/tuning.json`.
 
 ## Lokal
 
 ```bash
 pip install -r requirements.txt
 python bot.py --dry-run          # alles rechnen, Telegram-Text nur anzeigen
+python bot.py --retune --dry-run # mit Optimierung
 python tests/fake_world.py       # Offline-Test mit simulierter Fussballwelt
 ```
 

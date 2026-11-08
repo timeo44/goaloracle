@@ -1,10 +1,28 @@
 name: GoalOracle
+run-name: ${{ github.event_name == 'schedule' && 'Zeitplan' || 'Manueller Lauf' }}
 
 on:
   schedule:
-    # 07:00 UTC = 08:00 Uhr Schweizer Winterzeit / 09:00 Sommerzeit
-    - cron: "0 7 * * *"
+    # GitHub kennt nur UTC. Beide Zeiten laufen um 09:35 Schweizer Zeit (Sommer bzw. Winter);
+    # der Plan-Schritt lässt nur den passenden laufen. Die Nachricht geht um 10:00 raus.
+    - cron: "35 7 * * *"
+    - cron: "35 8 * * *"
+    # Montag früh: Modell-Einstellungen per Rückblick neu optimieren (ohne Nachricht)
+    - cron: "15 2 * * 1"
   workflow_dispatch:
+    inputs:
+      notify:
+        description: "Telegram-Nachricht senden"
+        type: boolean
+        default: false
+      refresh_odds:
+        description: "Quoten neu laden (kostet Credits)"
+        type: boolean
+        default: false
+      retune:
+        description: "Modell-Einstellungen neu optimieren (dauert 5–10 Minuten)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # Tipps, Bilanz und Cache speichern
@@ -18,38 +36,66 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Plan
+        id: plan
+        run: |
+          RUN=true; ARGS=""
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            OFF=$(TZ=Europe/Zurich date +%z)
+            CRON="${{ github.event.schedule }}"
+            if [ "$CRON" = "15 2 * * 1" ]; then ARGS="--retune"
+            elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00"
+            elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00"
+            else RUN=false; fi
+          else
+            if [ "${{ inputs.notify }}" = "true" ]; then ARGS="$ARGS --notify"; fi
+            if [ "${{ inputs.refresh_odds }}" = "true" ]; then ARGS="$ARGS --refresh-odds"; fi
+            if [ "${{ inputs.retune }}" = "true" ]; then ARGS="$ARGS --retune"; fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+          echo "Lauf: $RUN, Optionen: $ARGS"
+
       - uses: actions/checkout@v5
+        if: steps.plan.outputs.run == 'true'
       - uses: actions/setup-python@v6
+        if: steps.plan.outputs.run == 'true'
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+        if: steps.plan.outputs.run == 'true'
 
-      - name: Tipps rechnen (Telegram + Web-App)
+      - name: Tipps rechnen
+        if: steps.plan.outputs.run == 'true'
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-        run: python bot.py
+        run: python bot.py ${{ steps.plan.outputs.args }}
 
       - name: Daten speichern
+        if: steps.plan.outputs.run == 'true'
         run: |
           git config user.name "goaloracle-bot"
           git config user.email "goaloracle-bot@users.noreply.github.com"
-          git add web/data.json web/paper.json web/sim.json cache
+          git add web/data.json web/paper.json web/sim.json web/history.json cache
           git diff --cached --quiet || git commit -m "Tipps vom $(date -u +%d.%m.%Y)"
           git pull --rebase --autostash -q || true
           git push
 
       - uses: actions/configure-pages@v6
+        if: steps.plan.outputs.run == 'true'
       - uses: actions/upload-pages-artifact@v5.0.0
+        if: steps.plan.outputs.run == 'true'
         with:
           path: web
       - id: deployment
+        if: steps.plan.outputs.run == 'true'
         uses: actions/deploy-pages@v5.0.0
