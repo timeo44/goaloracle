@@ -54,7 +54,25 @@
   color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: auto; }
+body { overscroll-behavior-y: none; text-rendering: optimizeSpeed; }
+/* Abschnitte ausserhalb des Bildschirms nicht rendern */
+.day, .slips, .picks, #view-bilanz .panel, #view-team .panel { content-visibility: auto; contain-intrinsic-size: auto 600px; }
+.card, .pick, .slip, .kpi { contain: layout paint; }
+/* Rückmeldung beim Antippen */
+.card:active, .pick:active, a.leg:active { transform: scale(.985); }
+.chip:active, .tab:active, .btn:active, .seg button:active, .gear:active, .back:active { transform: scale(.96); }
+.card, .pick, .chip, .tab, .btn, .seg button, .gear { transition: transform .08s ease-out, border-color .12s; }
+tr[data-href]:active td { background: var(--sunken); }
+/* Grössere Tippflächen auf dem Handy */
+@media (pointer: coarse) {
+  .chip { padding: 9px 14px; font-size: 13.5px; }
+  .seg button { padding: 11px 6px; }
+  .more, .back { padding: 10px 8px; }
+  .form .fm { width: 24px; height: 24px; font-size: 13px; }
+  .rank td { padding-top: 11px; padding-bottom: 11px; }
+}
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
@@ -738,12 +756,20 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   // ---------- Bausteine ----------
   // Wappen direkt vom ESPN-Bildserver (ohne Referrer, damit nichts blockiert wird)
-  const logoUrl = (t) => (t.logo || "").replace(/^http:/, "https:");
+  // Wappen: kleine lokale Kopie (crests/ID.webp), sonst ESPN-Bild, sonst Kürzel
+  let CRESTS = new Set();
+  function logoUrl(t) {
+    let id = t.id;
+    if (!id && t.logo) { const m = t.logo.match(/\/(\d+)\.png/); if (m) id = m[1]; }
+    if (id && CRESTS.has(String(id))) return `crests/${id}.webp`;
+    return (t.logo || "").replace(/^http:/, "https:");
+  }
   function crest(t, cls = "") {
     const fb = `<span class="crest fb ${cls}" aria-hidden="true">${esc(t.tla)}</span>`;
     const src = logoUrl(t);
     if (!src) return fb;
-    return `<span class="crest ${cls}"><img src="${esc(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-tla="${esc(t.tla)}"></span>`;
+    const px = cls === "lg" ? 64 : cls === "sm" ? 22 : 28;
+    return `<span class="crest ${cls}"><img src="${esc(src)}" width="${px}" height="${px}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-tla="${esc(t.tla)}"></span>`;
   }
   document.addEventListener("error", (e) => {
     const img = e.target;
@@ -790,20 +816,36 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   // ---------- Navigation ----------
   const VIEWS = ["spiele", "spiel", "team", "tipps", "testlauf", "ranking", "bilanz", "einstellungen"];
   let lastList = "spiele";
+  // Jeder Bereich wird erst gebaut, wenn er sichtbar wird (spart Rechenzeit auf dem Handy)
+  const dirty = new Set();
+  const RENDER = { spiele: () => renderMatches(), tipps: () => renderTipps(), ranking: () => renderRanking(),
+    bilanz: () => renderBilanz(), einstellungen: () => { renderSettings(); renderModel(); } };
+  function markDirty(...views) { (views.length ? views : Object.keys(RENDER)).forEach((v) => dirty.add(v)); renderVisible(); }
+  let currentView = null;
+  function renderVisible() { if (currentView && dirty.has(currentView) && RENDER[currentView]) { dirty.delete(currentView); RENDER[currentView](); } }
+  const scrollMem = {};
   function route() {
     const h = location.hash.slice(1);
     let v = h.startsWith("spiel-") ? "spiel" : h.startsWith("team-") ? "team" : VIEWS.includes(h) ? h : "spiele";
+    if (currentView && currentView !== v) scrollMem[currentView] = window.scrollY;
+    const prev = currentView;
+    currentView = v;
     VIEWS.forEach((x) => ($("#view-" + x).hidden = x !== v));
+    renderVisible();
+    // Zurück zu einer Liste: alte Scroll-Position wiederherstellen
+    if (prev && prev !== v && (prev === "spiel" || prev === "team") && scrollMem[v] != null) requestAnimationFrame(() => window.scrollTo(0, scrollMem[v]));
     const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v;
     $$(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === tabV)));
     $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
     if (v === "team") renderTeam(h.slice(5));
     if (v === "testlauf") ensureSim();
-    if (v === "tipps") renderTipps();
     if (v !== "spiel" && v !== "team" && v !== "einstellungen") lastList = v;
   }
-  $$(".tab").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.view; window.scrollTo(0, 0); }));
+  $$(".tab").forEach((b) => b.addEventListener("click", () => {
+    if (location.hash.slice(1) === b.dataset.view) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    location.hash = b.dataset.view; window.scrollTo(0, 0);
+  }));
   $("#gear").addEventListener("click", () => { location.hash = location.hash === "#einstellungen" ? lastList : "einstellungen"; window.scrollTo(0, 0); });
   window.addEventListener("hashchange", () => { route(); });
 
@@ -893,12 +935,39 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       $("#matches").innerHTML = `<div class="empty"><strong>Keine Spiele</strong>In den nächsten ${data.days_ahead} Tagen sind in den gewählten Wettbewerben keine Spiele angesetzt.</div>`;
       return;
     }
-    const days = new Map();
-    list.forEach((u) => { const k = new Date(u.kickoff).toDateString(); if (!days.has(k)) days.set(k, []); days.get(k).push(u); });
-    let out = "";
-    days.forEach((l) => { out += `<section class="day"><h2 class="sec">${esc(fDay.format(new Date(l[0].kickoff)))}</h2><div class="grid">${l.map(card).join("")}</div></section>`; });
-    $("#matches").innerHTML = out;
+    // Zuerst ~30 Karten, den Rest beim Scrollen nachladen (flüssiger auf dem Handy)
+    matchList = list; matchShown = 0;
+    $("#matches").innerHTML = `<div id="match-days"></div><div id="match-more" class="more-sentinel"></div>`;
+    appendMatches(30);
+    if (matchObs) matchObs.disconnect();
+    if ("IntersectionObserver" in window) {
+      matchObs = new IntersectionObserver((en) => { if (en.some((x) => x.isIntersecting)) appendMatches(24); }, { rootMargin: "800px 0px" });
+      matchObs.observe($("#match-more"));
+    }
   }
+  let matchList = [], matchShown = 0, matchObs = null;
+  function appendMatches(n) {
+    if (matchShown >= matchList.length) return;
+    const chunk = matchList.slice(matchShown, matchShown + n);
+    const box = $("#match-days");
+    if (!box) return;
+    let lastSec = box.lastElementChild;
+    let html = "", openKey = lastSec ? lastSec.dataset.k : null, buf = [], bufKey = null;
+    const flush = () => {
+      if (!buf.length) return;
+      if (bufKey === openKey && lastSec) { lastSec.querySelector(".grid").insertAdjacentHTML("beforeend", buf.map(card).join("")); }
+      else html += `<section class="day" data-k="${esc(bufKey)}"><h2 class="sec">${esc(fDay.format(new Date(buf[0].kickoff)))}</h2><div class="grid">${buf.map(card).join("")}</div></section>`;
+      buf = [];
+    };
+    chunk.forEach((u) => { const k = new Date(u.kickoff).toDateString(); if (k !== bufKey) { flush(); bufKey = k; } buf.push(u); });
+    flush();
+    if (html) box.insertAdjacentHTML("beforeend", html);
+    matchShown += chunk.length;
+    const more = $("#match-more");
+    if (more) more.innerHTML = matchShown < matchList.length
+      ? `<button type="button" class="chip" id="match-more-btn" style="margin:18px auto;display:block">Weitere ${matchList.length - matchShown} Spiele anzeigen</button>` : "";
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("#match-more-btn")) appendMatches(40); });
 
   // ---------- Tipps-Tab ----------
   const tp = Object.assign({ kind: "single", hours: 48, legs: 2 }, store.get("go-tp") || {});
@@ -1584,9 +1653,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $$("#set-risk button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === settings.risk)));
     $("#set-risk-note").textContent = riskNote(settings.risk);
   }
-  $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); renderMatches(); renderTipps(); });
-  $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); renderTipps(); });
-  $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); renderTipps(); });
+  $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); markDirty("spiele", "tipps"); });
+  $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); markDirty("spiele", "tipps"); });
+  $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); markDirty("spiele", "tipps"); });
 
   // ---------- Modell-Panel: Kennzahlen, Datenquellen, manueller Lauf ----------
   const GH = (() => {
@@ -1809,8 +1878,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (!data.odds.key) notes.push("<b>Noch ohne Marktquoten.</b> Tipps werden nach Wahrscheinlichkeit sortiert. Mit einem Odds-API-Key erkennt GoalOracle auch Value.");
     $("#notice").innerHTML = notes.join(" "); $("#notice").hidden = !notes.length;
     $("#model-note").textContent = `Modell: Dixon-Coles über ${data.model.club_teams} Clubs und ${data.model.club_matches.toLocaleString("de-CH")} Spiele, Heimvorteil ${data.model.home_adv.toFixed(2)}×. Wappen und Spielpläne: ESPN. Quoten: The Odds API, historisch football-data.co.uk.`;
-    renderMatches(); renderRanking(); renderBilanz(); renderSettings(); renderTipps(); renderModel(); resumeRun();
+    CRESTS = new Set((data.crests || []).map(String));
+    dirty.clear(); Object.keys(RENDER).forEach((v) => dirty.add(v));
+    currentView = null;
     route();
+    resumeRun();
   }
   // Offene App: alle 10 Minuten prüfen, ob der Bot neue Daten veröffentlicht hat, und still nachladen
   function autoRefresh() {

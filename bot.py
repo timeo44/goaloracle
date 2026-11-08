@@ -21,7 +21,7 @@ import config as C
 import engine as E
 import tuning as T
 from predictor import Params, Predictor
-from sources import espn, fdcouk, oddsapi
+from sources import crests, espn, fdcouk, oddsapi
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
@@ -205,6 +205,9 @@ def main():
     data["ratings"] = E.team_ratings(pr, rankings, shown, events, now)
     opp = {x[1] for t in data["forms"] for x in data["forms"][t]}
     data["teams"] = {t: info[t] for t in opp if t in info}
+    # Wappen lokal und klein ablegen (schneller auf dem Handy)
+    crest_ids = shown | opp | {x["home"].get("id") for x in history} | {x["away"].get("id") for x in history}
+    data["crests"] = sorted(crests.sync({t: info[t] for t in crest_ids if t in info}, WEB / "crests"))
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
     write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
