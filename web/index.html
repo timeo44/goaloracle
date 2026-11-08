@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--PWA-->
+<meta name="theme-color" content="#121A16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GoalOracle">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root { padding-top: env(safe-area-inset-top, 0px); }</style>
+<!--/PWA-->
+<!--APP-->
+<title>GoalOracle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Matchblatt – schlichte Kopfzeile, Spieltage als Raster aus Matchkarten,
+   der Resultat-Tipp sitzt wie eine TV-Score-Einblendung rechts in jeder Karte. */
+:root {
+  --bg: #F2F4F1;
+  --surface: #FFFFFF;
+  --sunken: #E8ECE8;
+  --ink: #121A16;
+  --muted: #5B6760;
+  --line: #D7DDD8;
+  --home: #0D6A46;
+  --draw: #9AA39E;
+  --away: #2E4E9E;
+  --good: #0D6A46;
+  --bad: #B13A2F;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --radius: 6px;
+  --nav-h: 0px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1310; --surface: #151D19; --sunken: #1C2621; --ink: #E6ECE8; --muted: #93A099;
+    --line: #27322C; --home: #47BF89; --draw: #6B7570; --away: #8DA5F0; --good: #47BF89; --bad: #EE7B6F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1310; --surface: #151D19; --sunken: #1C2621; --ink: #E6ECE8; --muted: #93A099;
+  --line: #27322C; --home: #47BF89; --draw: #6B7570; --away: #8DA5F0; --good: #47BF89; --bad: #EE7B6F;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.5 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--home); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- Kopf ---------- */
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.top .wrap { display: flex; align-items: center; gap: 24px; padding-block: 12px; }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 {
+  margin: 0; font: 700 26px/1 var(--font-display); letter-spacing: .01em; text-transform: uppercase;
+}
+.brand h1 span { color: var(--home); }
+.stamp { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+nav.tabs { display: flex; gap: 4px; margin-left: auto; }
+.tab {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  font: 600 15px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); padding: 10px 12px; border-radius: var(--radius);
+  display: flex; align-items: center; gap: 8px;
+}
+.tab:hover { color: var(--ink); background: var(--sunken); }
+.tab[aria-selected="true"] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--home); border-radius: 0; }
+.tab svg { width: 20px; height: 20px; display: none; }
+
+/* Handy: Tabs unten wie in einer App */
+@media (max-width: 719px) {
+  :root { --nav-h: 62px; }
+  .top .wrap { flex-wrap: wrap; row-gap: 2px; padding-block: 10px; }
+  .brand { flex-direction: column; align-items: flex-start; gap: 2px; }
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; margin: 0;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 6px max(8px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-right, 0px));
+    gap: 0;
+  }
+  .tab { flex: 1; flex-direction: column; gap: 3px; font-size: 12px; padding: 6px 4px; }
+  .tab svg { display: block; }
+  .tab[aria-selected="true"] { box-shadow: none; color: var(--home); }
+}
+
+main { padding-block: 20px 40px; }
+.view[hidden] { display: none !important; }
+
+.demo {
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  padding: 8px 12px; margin-bottom: 18px; font-size: 13px; color: var(--muted);
+}
+.demo b { color: var(--ink); }
+
+/* ---------- Tipps ---------- */
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 8px;
+}
+.toolbar p { margin: 0; color: var(--muted); font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.seg button {
+  appearance: none; border: 0; background: var(--surface); padding: 7px 12px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+.day { margin-top: 26px; }
+.day h2 {
+  margin: 0 0 12px; font: 600 15px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 12px;
+}
+.day h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); align-items: start; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  display: grid; min-width: 0;
+}
+.card-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 10px 14px 0; font-size: 12.5px; color: var(--muted);
+}
+.kick { font-weight: 600; color: var(--ink); }
+.conf { display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; font-weight: 600; }
+.pips { display: inline-flex; gap: 2px; }
+.pips i { width: 6px; height: 10px; border-radius: 1px; background: var(--line); }
+.pips i.on { background: var(--ink); }
+
+.fixture { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 10px 14px 12px; align-items: stretch; }
+.teams { display: grid; gap: 6px; min-width: 0; align-content: center; }
+.team { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.badge {
+  flex: none; width: 36px; height: 24px; border: 1px solid var(--ink); border-radius: 3px;
+  display: grid; place-items: center; font: 700 13px/1 var(--font-display); letter-spacing: .04em;
+}
+.tname { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tname small { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 4px; }
+.bug {
+  background: var(--ink); color: var(--bg); border-radius: 4px; min-width: 44px;
+  display: grid; grid-template-rows: 1fr 1fr; text-align: center;
+  font: 700 26px/1 var(--font-display);
+}
+.bug span { display: grid; place-items: center; padding: 2px 10px; }
+.bug span + span { border-top: 1px solid color-mix(in srgb, var(--bg) 25%, transparent); }
+
+.probs { padding: 0 14px 12px; display: grid; gap: 6px; }
+.bar { display: flex; height: 8px; border-radius: 2px; overflow: hidden; gap: 2px; }
+.bar i { display: block; height: 100%; }
+.bar .h { background: var(--home); }
+.bar .d { background: var(--draw); }
+.bar .a { background: var(--away); }
+.legend { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 5px; align-items: baseline; }
+.legend b { font-weight: 600; color: var(--ink); }
+.legend .pick { color: var(--ink); font-weight: 700; }
+.legend .pick b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+.card-foot {
+  border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px 8px 14px;
+}
+.tip-chip {
+  font: 700 14px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase;
+  padding: 5px 8px; border-radius: 3px; color: var(--surface);
+}
+.tip-chip.t1 { background: var(--home); } .tip-chip.tX { background: var(--draw); } .tip-chip.t2 { background: var(--away); }
+.foot-note { font-size: 12.5px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more {
+  margin-left: auto; appearance: none; background: none; border: 0; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--muted); padding: 6px 8px; border-radius: var(--radius);
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+}
+.more:hover { background: var(--sunken); color: var(--ink); }
+.more svg { width: 14px; height: 14px; transition: transform .15s; }
+.more[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.details { border-top: 1px solid var(--line); padding: 14px; display: grid; gap: 14px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--sunken); border-radius: 4px; padding: 8px 10px; }
+.stat dt { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.stat dd { margin: 2px 0 0; font: 600 20px/1.1 var(--font-display); }
+.heat-wrap { overflow-x: auto; }
+.heat-title { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+.heat { border-collapse: separate; border-spacing: 2px; font-size: 11.5px; width: 100%; min-width: 280px; }
+.heat th { font-weight: 600; color: var(--muted); padding: 2px; font-size: 11px; }
+.heat td {
+  text-align: center; padding: 6px 0; border-radius: 2px; color: var(--ink);
+  background: color-mix(in srgb, var(--home) calc(var(--v) * 100%), var(--sunken));
+}
+.heat td.hot { color: var(--surface); }
+.heat td.best { outline: 2px solid var(--ink); outline-offset: -2px; font-weight: 700; }
+.heat caption { caption-side: bottom; text-align: left; color: var(--muted); font-size: 11.5px; padding-top: 6px; }
+
+/* ---------- Ranking ---------- */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.table-wrap { overflow-x: auto; }
+table.rank { width: 100%; border-collapse: collapse; min-width: 340px; }
+.rank th {
+  text-align: left; font: 600 12px/1 var(--font-body); text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); padding: 12px 10px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.rank td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rank tr:last-child td { border-bottom: 0; }
+.rank .num { text-align: right; }
+.rank .pos { width: 1%; color: var(--muted); font-weight: 600; text-align: right; }
+.rank .t { display: flex; align-items: center; gap: 10px; }
+.rank .t span { font-weight: 600; }
+.diffbar { position: relative; width: 120px; height: 8px; background: var(--sunken); border-radius: 2px; }
+.diffbar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.diffbar i { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.pos-d { color: var(--good); font-weight: 600; } .neg-d { color: var(--bad); font-weight: 600; }
+.form { display: inline-flex; gap: 3px; }
+.form i {
+  font-style: normal; width: 20px; height: 20px; border-radius: 3px; display: grid; place-items: center;
+  font: 700 12px/1 var(--font-display); color: var(--surface);
+}
+.form .S { background: var(--good); } .form .U { background: var(--draw); } .form .N { background: var(--bad); }
+.rank-note { margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+@media (max-width: 719px) {
+  .hide-sm { display: none; }
+  .rank th, .rank td { padding-left: 6px; padding-right: 6px; }
+  .rank .t > span:last-child { max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
+  .form { gap: 2px; }
+  .form i { width: 16px; height: 18px; font-size: 11px; }
+  .log .t { gap: 4px; }
+  .mark { padding: 3px 4px; font-size: 11px; }
+}
+
+/* ---------- Bilanz ---------- */
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 719px) {
+  .kpis { gap: 8px; }
+  .kpi { padding: 10px 10px; }
+  .kpi dt { font-size: 10.5px; letter-spacing: .05em; }
+  .kpi dd { font-size: 30px; }
+  .kpi dd small { font-size: 11.5px; }
+}
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.kpi dt { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.kpi dd { margin: 4px 0 0; font: 700 40px/1 var(--font-display); }
+.kpi dd small { font: 500 13px/1.3 var(--font-body); color: var(--muted); display: block; margin-top: 6px; }
+.log td { white-space: nowrap; }
+.mark { font: 700 12px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-radius: 3px; }
+.mark.ok { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.mark.no { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.mark.exact { background: var(--good); color: var(--surface); }
+.pending { color: var(--muted); font-size: 13px; }
+.log .t { gap: 6px; }
+.log .t .hide-sm { margin-left: 6px; font-weight: 500; }
+.vs { color: var(--muted); }
+.sub { color: var(--muted); margin-left: 4px; }
+.muted-d { color: var(--muted); }
+
+.empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+.empty strong { display: block; color: var(--ink); font: 600 22px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+
+footer.foot { border-top: 1px solid var(--line); padding-block: 18px 28px; color: var(--muted); font-size: 12.5px; }
+footer.foot p { margin: 0; max-width: 75ch; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!--/APP-->
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Goal<span>Oracle</span></h1>
+      <div class="stamp" id="stamp">Daten werden geladen …</div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Bereiche">
+      <button class="tab" role="tab" id="tab-tipps" data-view="tipps" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Tipps</button>
+      <button class="tab" role="tab" id="tab-ranking" data-view="ranking" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Ranking</button>
+      <button class="tab" role="tab" id="tab-bilanz" data-view="bilanz" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12l5 5L20 6"/></svg>Bilanz</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="demo" class="demo" hidden><b>Demo-Daten.</b> Simulierte Spiele zum Ansehen des Designs. Echte Tipps erscheinen nach dem ersten Lauf des Bots.</div>
+
+  <section class="view" id="view-tipps" role="tabpanel" aria-labelledby="tab-tipps">
+    <div class="toolbar">
+      <p id="tips-summary"></p>
+      <div class="seg" role="group" aria-label="Filter">
+        <button type="button" id="f-all" aria-pressed="true">Alle Spiele</button>
+        <button type="button" id="f-safe" aria-pressed="false">Nur sichere Tipps</button>
+      </div>
+    </div>
+    <div id="tips"></div>
+  </section>
+
+  <section class="view" id="view-ranking" role="tabpanel" aria-labelledby="tab-ranking" hidden>
+    <div class="panel table-wrap"><table class="rank" id="rank"></table></div>
+    <p class="rank-note">Erwartete Tore pro Spiel gegen ein durchschnittliches Premier-League-Team, berechnet aus allen Resultaten der letzten Saisons (neuere Spiele zählen stärker). Form: letzte fünf Spiele, S = Sieg, U = Unentschieden, N = Niederlage.</p>
+  </section>
+
+  <section class="view" id="view-bilanz" role="tabpanel" aria-labelledby="tab-bilanz" hidden>
+    <dl class="kpis" id="kpis"></dl>
+    <div class="panel table-wrap"><table class="rank log" id="log"></table></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap"><p id="model-note">Wahrscheinlichkeiten aus einem statistischen Modell (Dixon-Coles). Keine Garantie. Wette nur mit Geld, dessen Verlust dir nichts ausmacht.</p></div>
+</footer>
+
+<script>window.GO_DATA = null; /*DATA*/</script>
+<script>
+(function () {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pct = (x) => Math.round(x * 100) + "%";
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } }
+  };
+  const dDay = new Intl.DateTimeFormat("de-CH", { weekday: "long", day: "numeric", month: "long" });
+  const dTime = new Intl.DateTimeFormat("de-CH", { hour: "2-digit", minute: "2-digit" });
+  const dShort = new Intl.DateTimeFormat("de-CH", { day: "2-digit", month: "2-digit" });
+  const dStamp = new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const CONF = { hoch: 3, mittel: 2, tief: 1 };
+  const chev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+
+  let data = null;
+  let onlySafe = store.get("go-safe") === "1";
+  const open = new Set();
+
+  // ---------- Navigation ----------
+  const VIEWS = ["tipps", "ranking", "bilanz"];
+  function show(v) {
+    if (!VIEWS.includes(v)) v = "tipps";
+    VIEWS.forEach((x) => {
+      $("#view-" + x).hidden = x !== v;
+      $("#tab-" + x).setAttribute("aria-selected", String(x === v));
+    });
+  }
+  document.querySelectorAll(".tab").forEach((b) =>
+    b.addEventListener("click", () => { location.hash = b.dataset.view; show(b.dataset.view); window.scrollTo(0, 0); }));
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+  function setFilter(safe) {
+    onlySafe = safe;
+    store.set("go-safe", safe ? "1" : "0");
+    $("#f-all").setAttribute("aria-pressed", String(!safe));
+    $("#f-safe").setAttribute("aria-pressed", String(safe));
+    renderTips();
+  }
+  $("#f-all").addEventListener("click", () => setFilter(false));
+  $("#f-safe").addEventListener("click", () => setFilter(true));
+
+  // ---------- Bausteine ----------
+  const badge = (t) => `<span class="badge" aria-hidden="true">${esc(t.tla)}</span>`;
+  const pips = (c) => `<span class="pips" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= CONF[c] ? "on" : ""}"></i>`).join("")}</span>`;
+
+  function heatmap(t) {
+    const g = t.grid, max = Math.max(...g.flat());
+    let rows = "";
+    for (let h = 0; h < g.length; h++) {
+      rows += `<tr><th scope="row">${h}</th>`;
+      for (let a = 0; a < g[h].length; a++) {
+        const v = g[h][a], rel = v / max;
+        const best = h === t.score[0] && a === t.score[1];
+        rows += `<td style="--v:${(rel * 0.85).toFixed(3)}" class="${rel > 0.55 ? "hot" : ""}${best ? " best" : ""}" title="${h}:${a} – ${(v * 100).toFixed(1)} %">${v >= 0.01 ? Math.round(v * 100) : ""}</td>`;
+      }
+      rows += "</tr>";
+    }
+    const head = `<tr><th></th>${g[0].map((_, a) => `<th scope="col">${a}</th>`).join("")}</tr>`;
+    return `<div class="heat-wrap"><p class="heat-title">Wahrscheinlichkeit jedes Resultats in % · Zeilen: Tore ${esc(t.home.tla)}, Spalten: Tore ${esc(t.away.tla)}</p>
+      <table class="heat">${head}${rows}<caption>Umrandet: wahrscheinlichstes Resultat</caption></table></div>`;
+  }
+
+  function card(t) {
+    const d = new Date(t.kickoff);
+    const [p1, px, p2] = t.p;
+    const isOpen = open.has(t.id);
+    const alt = (t.score_tip[0] !== t.score[0] || t.score_tip[1] !== t.score[1])
+      ? `Passend zum Tipp: ${t.score_tip[0]}:${t.score_tip[1]} (${pct(t.score_tip[2])})` : `Resultat-Tipp passt zum 1X2-Tipp`;
+    const tipLabel = { "1": `Sieg ${t.home.tla}`, "X": "Unentschieden", "2": `Sieg ${t.away.tla}` }[t.tip];
+    const leg = (k, label, p) => `<span class="${t.tip === k ? "pick" : ""}">${label} <b>${pct(p)}</b></span>`;
+    return `<article class="card" aria-label="${esc(t.home.name)} gegen ${esc(t.away.name)}">
+      <div class="card-head">
+        <span><span class="kick">${dTime.format(d)}</span></span>
+        <span class="conf">${pips(t.confidence)} Sicherheit ${esc(t.confidence)}</span>
+      </div>
+      <div class="fixture">
+        <div class="teams">
+          <div class="team">${badge(t.home)}<span class="tname">${esc(t.home.name)}<small>Heim</small></span></div>
+          <div class="team">${badge(t.away)}<span class="tname">${esc(t.away.name)}</span></div>
+        </div>
+        <div class="bug" aria-label="Resultat-Tipp ${t.score[0]} zu ${t.score[1]}"><span>${t.score[0]}</span><span>${t.score[1]}</span></div>
+      </div>
+      <div class="probs">
+        <div class="bar" aria-hidden="true"><i class="h" style="width:${p1 * 100}%"></i><i class="d" style="width:${px * 100}%"></i><i class="a" style="width:${p2 * 100}%"></i></div>
+        <div class="legend">${leg("1", "1", p1)}${leg("X", "X", px)}${leg("2", "2", p2)}</div>
+      </div>
+      <div class="card-foot">
+        <span class="tip-chip t${t.tip}">Tipp ${t.tip}</span>
+        <span class="foot-note">${esc(tipLabel)} · ${t.score[0]}:${t.score[1]} mit ${pct(t.score[2])}</span>
+        <button class="more" type="button" data-id="${esc(t.id)}" aria-expanded="${isOpen}">Details ${chev}</button>
+      </div>
+      <div class="details" ${isOpen ? "" : "hidden"}>
+        <dl class="stats">
+          <div class="stat"><dt>xG</dt><dd>${t.xg[0].toFixed(1)} – ${t.xg[1].toFixed(1)}</dd></div>
+          <div class="stat"><dt>Über 2.5</dt><dd>${pct(t.over25)}</dd></div>
+          <div class="stat"><dt>Beide treffen</dt><dd>${pct(t.btts)}</dd></div>
+        </dl>
+        ${heatmap(t)}
+        <p class="heat-title" style="margin:0">${esc(alt)}</p>
+      </div>
+    </article>`;
+  }
+
+  // ---------- Ansichten ----------
+  function renderTips() {
+    const tips = data.tips.filter((t) => !onlySafe || t.confidence === "hoch");
+    const total = data.tips.length;
+    $("#tips-summary").textContent = total
+      ? `${total} Spiele in den nächsten ${data.days_ahead} Tagen` + (onlySafe ? ` · ${tips.length} mit hoher Sicherheit` : "")
+      : "";
+    if (!tips.length) {
+      $("#tips").innerHTML = total
+        ? `<div class="empty"><strong>Keine sicheren Tipps</strong>Kein Spiel erreicht gerade 60 % für einen Ausgang.</div>`
+        : `<div class="empty"><strong>Länderspielpause?</strong>In den nächsten ${data.days_ahead} Tagen sind keine Premier-League-Spiele angesetzt.</div>`;
+      return;
+    }
+    const days = new Map();
+    tips.forEach((t) => {
+      const k = new Date(t.kickoff).toDateString();
+      if (!days.has(k)) days.set(k, []);
+      days.get(k).push(t);
+    });
+    let out = "";
+    days.forEach((list) => {
+      out += `<section class="day"><h2>${esc(dDay.format(new Date(list[0].kickoff)))}</h2><div class="grid">${list.map(card).join("")}</div></section>`;
+    });
+    $("#tips").innerHTML = out;
+  }
+  $("#tips").addEventListener("click", (e) => {
+    const b = e.target.closest(".more");
+    if (!b) return;
+    const id = b.dataset.id, det = b.closest(".card").querySelector(".details");
+    const nowOpen = det.hidden;
+    det.hidden = !nowOpen;
+    b.setAttribute("aria-expanded", String(nowOpen));
+    nowOpen ? open.add(id) : open.delete(id);
+  });
+
+  function renderRanking() {
+    const rows = data.table;
+    const maxD = Math.max(0.5, ...rows.map((r) => Math.abs(r.gf - r.ga)));
+    const body = rows.map((r, i) => {
+      const diff = r.gf - r.ga, w = Math.abs(diff) / maxD * 50;
+      const bar = `<span class="diffbar" aria-hidden="true"><i style="${diff >= 0 ? `left:50%;width:${w}%;background:var(--good)` : `right:50%;width:${w}%;background:var(--bad)`}"></i></span>`;
+      const form = r.form ? `<span class="form" aria-label="Form ${esc(r.form)}">${[...r.form].map((c) => `<i class="${c}">${c}</i>`).join("")}</span>` : "–";
+      return `<tr><td class="pos">${i + 1}</td>
+        <td><span class="t">${badge(r.team)}<span>${esc(r.team.name)}</span></span></td>
+        <td class="num hide-sm">${r.gf.toFixed(2)}</td><td class="num hide-sm">${r.ga.toFixed(2)}</td>
+        <td class="num ${diff >= 0 ? "pos-d" : "neg-d"}">${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}</td>
+        <td class="hide-sm">${bar}</td><td>${form}</td></tr>`;
+    }).join("");
+    $("#rank").innerHTML = `<thead><tr><th class="pos">#</th><th>Team</th><th class="num hide-sm">Tore +</th><th class="num hide-sm">Tore −</th><th class="num">Diff.</th><th class="hide-sm">Stärke</th><th>Form</th></tr></thead><tbody>${body}</tbody>`;
+  }
+
+  function renderBilanz() {
+    const done = data.history.filter((h) => h.result);
+    const outcome = (h, a) => (h > a ? "1" : h === a ? "X" : "2");
+    const hits = done.filter((h) => h.tip === outcome(h.result[0], h.result[1])).length;
+    const exact = done.filter((h) => h.score[0] === h.result[0] && h.score[1] === h.result[1]).length;
+    const rate = (n) => (done.length ? Math.round((n / done.length) * 100) + "%" : "–");
+    $("#kpis").innerHTML = `
+      <div class="kpi"><dt>1X2 richtig</dt><dd>${rate(hits)}<small>${hits} von ${done.length} Tipps</small></dd></div>
+      <div class="kpi"><dt>Resultat exakt</dt><dd>${rate(exact)}<small>${exact} von ${done.length} Tipps</small></dd></div>
+      <div class="kpi"><dt>Offene Tipps</dt><dd>${data.history.length - done.length}<small>werden nach Abpfiff ausgewertet</small></dd></div>`;
+    if (!data.history.length) {
+      $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Noch keine Bilanz</strong>Sobald das erste getippte Spiel gespielt ist, steht hier, ob der Tipp gestimmt hat.</div></td></tr></tbody>`;
+      return;
+    }
+    const body = data.history.map((h) => {
+      let res = `<span class="pending">offen</span>`, mark = "";
+      if (h.result) {
+        res = `<b>${h.result[0]}:${h.result[1]}</b>`;
+        const ex = h.score[0] === h.result[0] && h.score[1] === h.result[1];
+        const ok = h.tip === outcome(h.result[0], h.result[1]);
+        mark = ex ? `<span class="mark exact">Exakt</span>` : ok ? `<span class="mark ok">Treffer</span>` : `<span class="mark no">Daneben</span>`;
+      }
+      return `<tr><td class="muted-d hide-sm">${esc(dShort.format(new Date(h.kickoff)))}</td>
+        <td><span class="t">${badge(h.home)}<span class="vs">–</span>${badge(h.away)}<span class="hide-sm">${esc(h.home.name)} – ${esc(h.away.name)}</span></span></td>
+        <td class="num">${h.tip} <span class="sub">${h.score[0]}:${h.score[1]}</span></td><td class="num">${res}</td><td>${mark}</td></tr>`;
+    }).join("");
+    $("#log").innerHTML = `<thead><tr><th class="hide-sm">Datum</th><th>Spiel</th><th class="num">Tipp</th><th class="num">Ergebnis</th><th></th></tr></thead><tbody>${body}</tbody>`;
+  }
+
+  function render() {
+    $("#demo").hidden = !data.demo;
+    $("#stamp").textContent = "Stand " + dStamp.format(new Date(data.generated)) + " · Premier League";
+    $("#model-note").textContent = `Wahrscheinlichkeiten aus einem statistischen Modell (Dixon-Coles, ${data.model.matches} ausgewertete Spiele, Heimvorteil ${data.model.home_adv.toFixed(2)}×). Keine Garantie. Wette nur mit Geld, dessen Verlust dir nichts ausmacht.`;
+    $("#f-all").setAttribute("aria-pressed", String(!onlySafe));
+    $("#f-safe").setAttribute("aria-pressed", String(onlySafe));
+    renderTips(); renderRanking(); renderBilanz();
+  }
+
+  function fail(msg) {
+    $("#stamp").textContent = "Keine Daten";
+    $("#tips").innerHTML = `<div class="empty"><strong>Noch keine Tipps</strong>${esc(msg)}</div>`;
+  }
+
+  show(location.hash.slice(1));
+  if (window.GO_DATA) { data = window.GO_DATA; render(); return; }
+  fetch("data.json?v=" + Date.now(), { cache: "no-store" })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { data = d; render(); })
+    .catch(() => fail("Die Datei data.json fehlt noch. Sie entsteht beim nächsten Lauf des Bots auf GitHub."));
+})();
+</script>
+</body>
+</html>

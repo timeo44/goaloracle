@@ -48,8 +48,8 @@ def current_season(today: datetime) -> int:
     return today.year if today.month >= 7 else today.year - 1
 
 
-def fetch_current_season(token: str, season: int) -> tuple[list[Match], dict[str, str]]:
-    """Alle Spiele der Saison (gespielt + angesetzt) und Anzeigenamen je Schlüssel."""
+def fetch_current_season(token: str, season: int):
+    """Alle Spiele der Saison (gespielt + angesetzt), Anzeigenamen und Kürzel je Schlüssel."""
     r = requests.get(f"{API_BASE}/competitions/PL/matches",
                      params={"season": season},
                      headers={**HEADERS, "X-Auth-Token": token}, timeout=30)
@@ -57,7 +57,7 @@ def fetch_current_season(token: str, season: int) -> tuple[list[Match], dict[str
         raise RuntimeError("football-data.org: Zugriff verweigert – Token prüfen.")
     r.raise_for_status()
 
-    matches, names = [], {}
+    matches, names, tlas = [], {}, {}
     for m in r.json().get("matches", []):
         if m["status"] in ("CANCELLED", "SUSPENDED"):
             continue
@@ -67,6 +67,8 @@ def fetch_current_season(token: str, season: int) -> tuple[list[Match], dict[str
         hk, ak = canon(home["name"]), canon(away["name"])
         names[hk] = home.get("shortName") or home["name"]
         names[ak] = away.get("shortName") or away["name"]
+        tlas[hk] = home.get("tla") or names[hk][:3].upper()
+        tlas[ak] = away.get("tla") or names[ak][:3].upper()
         ft = (m.get("score") or {}).get("fullTime") or {}
         finished = m["status"] == "FINISHED" and ft.get("home") is not None
         matches.append(Match(
@@ -75,7 +77,7 @@ def fetch_current_season(token: str, season: int) -> tuple[list[Match], dict[str
             hg=ft["home"] if finished else None,
             ag=ft["away"] if finished else None,
         ))
-    return matches, names
+    return matches, names, tlas
 
 
 def _parse_date(s: str) -> datetime | None:
@@ -106,13 +108,13 @@ def fetch_past_season(season: int) -> list[Match]:
 
 
 def load_all(token: str, today: datetime, prev_seasons: int = 2):
-    """Gibt (alle Spiele, Anzeigenamen, Warnungen) zurück."""
+    """Gibt (alle Spiele, Anzeigenamen, Kürzel, Warnungen) zurück."""
     season = current_season(today)
-    matches, names = fetch_current_season(token, season)
+    matches, names, tlas = fetch_current_season(token, season)
     warnings = []
     for s in range(season - prev_seasons, season):
         try:
             matches += fetch_past_season(s)
         except Exception as e:  # Vorsaison fehlt: Bot läuft trotzdem weiter
             warnings.append(f"Saison {s}/{(s + 1) % 100:02d} nicht geladen ({e})")
-    return matches, names, warnings
+    return matches, names, tlas, warnings

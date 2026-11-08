@@ -19,6 +19,7 @@ import requests
 
 from data import load_all
 from model import DixonColes, Match
+from web_export import write_data
 
 TZ = ZoneInfo("Europe/Zurich")
 WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
@@ -154,6 +155,9 @@ def main() -> None:
                     help="Tipps für Spiele der nächsten N Tage (Standard 4)")
     ap.add_argument("--backtest-days", type=int, default=180)
     ap.add_argument("--xi", type=float, default=0.0019, help="Zeitgewichtung pro Tag")
+    ap.add_argument("--web", metavar="PFAD", help="Daten für die Web-App schreiben, z. B. web/data.json")
+    ap.add_argument("--web-days", type=int, default=10, help="Tipps in der Web-App für N Tage (Standard 10)")
+    ap.add_argument("--no-telegram", action="store_true", help="keine Telegram-Nachricht senden")
     args = ap.parse_args()
 
     fd_token = os.getenv("FOOTBALL_DATA_TOKEN")
@@ -161,14 +165,20 @@ def main() -> None:
         sys.exit("FOOTBALL_DATA_TOKEN fehlt (gratis auf football-data.org/client/register).")
 
     now = datetime.now(timezone.utc)
-    matches, names, warnings = load_all(fd_token, now)
+    matches, names, tlas, warnings = load_all(fd_token, now)
 
     if args.backtest:
         text = backtest(matches, now, args.backtest_days, args.xi)
     else:
         model = DixonColes(xi=args.xi).fit(matches, now)
         text = build_report(model, matches, names, now, args.days, warnings)
+        if args.web:
+            write_data(args.web, model=model, matches=matches, names=names, tlas=tlas,
+                       now=now, days_ahead=args.web_days)
+            print(f"Web-Daten geschrieben: {args.web}")
 
+    if args.no_telegram:
+        return
     if args.dry_run:
         print(text)
         return
