@@ -112,7 +112,9 @@ def main():
     print(f"Quoten/Ecken zugeordnet: {n} Spiele")
 
     models = E.fit_models(events, now)
-    info, form = E.team_info(events), E.form_of(events, now)
+    info = E.team_info(events)
+    fdet = E.form_details(events)
+    form = E.form_of(events, now, fdet)
     by_id = {e["id"]: e for e in events}
 
     odds, credits = {}, None
@@ -142,7 +144,14 @@ def main():
                   "home_adv": round(2.718281828 ** models.club.home_adv, 2),
                   "corners": bool(models.corners)},
         "upcoming": upcoming, "rankings": rankings, "history": history,
+        "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
+    # Form-Details nur für Teams, die in der App vorkommen
+    shown = {u[s]["id"] for u in upcoming for s in ("home", "away")} | \
+            {r["team"]["id"] for rows in rankings.values() for r in rows}
+    data["forms"] = {t: fdet[t] for t in shown if t in fdet}
+    opp = {x[1] for t in data["forms"] for x in data["forms"][t]}
+    data["teams"] = {t: info[t] for t in opp if t in info}
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
     if not args.skip_sim:

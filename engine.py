@@ -122,15 +122,23 @@ def team_info(events):
     return info
 
 
-def form_of(events, now):
+def form_details(events) -> dict[str, list]:
+    """Letzte 5 Spiele je Team: [Ergebnis, Gegner-ID, Tore, Gegentore, Heim 1/0, Datum, Wettbewerb, Verl. 1/0]."""
     res = defaultdict(list)
     for e in sorted(events, key=lambda e: e["date"]):
         if e["completed"] and e["hs"] is not None and e["status"] in FINAL_90 | FINAL_ET:
-            h, a = e["home"]["id"], e["away"]["id"]
-            r = "U" if e["hs"] == e["as"] else ("S" if e["hs"] > e["as"] else "N")
-            res[h].append(r)
-            res[a].append({"S": "N", "N": "S", "U": "U"}[r])
-    return {k: "".join(v[-5:]) for k, v in res.items()}
+            h, a, hs, as_ = e["home"]["id"], e["away"]["id"], e["hs"], e["as"]
+            et = 0 if e["status"] in FINAL_90 else 1
+            r = "U" if hs == as_ else ("S" if hs > as_ else "N")
+            day = e["date"][:10]
+            res[h].append([r, a, hs, as_, 1, day, e["slug"], et])
+            res[a].append([{"S": "N", "N": "S", "U": "U"}[r], h, as_, hs, 0, day, e["slug"], et])
+    return {k: v[-5:] for k, v in res.items()}
+
+
+def form_of(events, now, details=None):
+    details = details or form_details(events)
+    return {k: "".join(x[0] for x in v) for k, v in details.items()}
 
 
 def r(x, d=4):

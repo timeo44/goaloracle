@@ -233,8 +233,27 @@ dl { margin: 0; }
 
 /* ---------- Form ---------- */
 .form { display: inline-flex; gap: 3px; }
-.form i { font-style: normal; width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font: 700 11.5px/1 var(--font-display); color: var(--surface); }
+.form .fm { appearance: none; border: 0; padding: 0; cursor: pointer; width: 20px; height: 20px; border-radius: 3px; display: grid; place-items: center; font: 700 12px/1 var(--font-display); color: var(--surface); transition: transform .1s; }
+.form .fm:hover, .form .fm.on { transform: translateY(-2px); box-shadow: 0 2px 0 var(--ink); }
 .form .S { background: var(--good); } .form .U { background: var(--draw); } .form .N { background: var(--bad); }
+
+/* ---------- Info-Blasen ---------- */
+[data-tip] { cursor: help; }
+th[data-tip], dt[data-tip], .kpi dt[data-tip] { text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.tipbox {
+  position: fixed; z-index: 50; max-width: min(280px, calc(100vw - 24px)); pointer-events: none;
+  background: var(--ink); color: var(--bg); border-radius: 6px; padding: 9px 11px; font-size: 12.5px; line-height: 1.45;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25); opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+}
+.tipbox.show { opacity: 1; transform: none; }
+.tipbox b { font-weight: 700; }
+.tipbox .tb-res { font: 700 16px/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .04em; display: flex; gap: 8px; align-items: baseline; }
+.tipbox .tb-res i { font-style: normal; padding: 2px 5px; border-radius: 3px; color: var(--surface); font-size: 12px; }
+.tipbox .tb-res i.S { background: var(--good); } .tipbox .tb-res i.U { background: var(--draw); } .tipbox .tb-res i.N { background: var(--bad); }
+.tipbox .tb-opp { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tipbox .tb-opp .crest { width: 22px; height: 22px; }
+.tipbox .tb-opp .crest.fb { border-color: var(--bg); width: 32px; height: 20px; font-size: 11px; }
+.tipbox .tb-meta { opacity: .75; margin-top: 4px; font-size: 12px; }
 
 /* ---------- Tabellen ---------- */
 table.rank { width: 100%; border-collapse: collapse; min-width: 320px; }
@@ -514,16 +533,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const saveSettings = () => store.set("go-settings", settings);
 
   // ---------- Bausteine ----------
-  function logoUrl(t, size) {
-    if (!t.logo) return "";
-    const m = t.logo.match(/espncdn\.com(\/i\/teamlogos\/[^?]+)/);
-    return m ? `https://a.espncdn.com/combiner/i?img=${m[1]}&w=${size}&h=${size}` : t.logo;
-  }
+  // Wappen direkt vom ESPN-Bildserver (ohne Referrer, damit nichts blockiert wird)
+  const logoUrl = (t) => (t.logo || "").replace(/^http:/, "https:");
   function crest(t, cls = "") {
     const fb = `<span class="crest fb ${cls}" aria-hidden="true">${esc(t.tla)}</span>`;
-    const src = logoUrl(t, cls === "lg" ? 128 : 64);
+    const src = logoUrl(t);
     if (!src) return fb;
-    return `<span class="crest ${cls}"><img src="${esc(src)}" alt="" loading="lazy" data-tla="${esc(t.tla)}"></span>`;
+    return `<span class="crest ${cls}"><img src="${esc(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-tla="${esc(t.tla)}"></span>`;
   }
   document.addEventListener("error", (e) => {
     const img = e.target;
@@ -532,10 +548,27 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     box.classList.add("fb");
     box.textContent = img.dataset.tla;
   }, true);
-  const formHtml = (f) => f ? `<span class="form" aria-label="Form ${esc(f)}">${[...f].map((c) => `<i class="${c}">${c}</i>`).join("")}</span>` : "";
+  function formHtml(team, fallback) {
+    const id = team && team.id, det = (data.forms && id && data.forms[id]) || null;
+    const f = det ? det.map((x) => x[0]).join("") : (fallback || (team && team.form) || "");
+    if (!f) return "";
+    const full = { S: "Sieg", U: "Unentschieden", N: "Niederlage" };
+    return `<span class="form" aria-label="Form, ältestes Spiel links">${[...f].map((c, i) =>
+      `<button type="button" class="fm ${c}" ${det ? `data-team="${esc(id)}" data-i="${i}"` : `data-tip="${full[c]}"`} aria-label="${full[c]}">${c}</button>`).join("")}</span>`;
+  }
+  function formTip(id, i) {
+    const x = data.forms[id][i];
+    const [res, oppId, gf, ga, home, day, comp, et] = x;
+    const opp = (data.teams && data.teams[oppId]) || { name: "Unbekannt", tla: "?", logo: "" };
+    const word = { S: "Sieg", U: "Remis", N: "Niederlage" }[res];
+    const cname = (data.comp_names && data.comp_names[comp]) || compName(comp);
+    return `<div class="tb-res"><i class="${res}">${res}</i>${word} ${gf}:${ga}${et ? " n. V." : ""}</div>
+      <div class="tb-opp">${crest(opp, "sm")}<span>${home ? "gegen" : "bei"} <b>${esc(opp.name)}</b></span></div>
+      <div class="tb-meta">${esc(new Intl.DateTimeFormat("de-CH", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(day)))} · ${esc(cname)} · ${home ? "Heimspiel" : "Auswärtsspiel"}</div>`;
+  }
   const compName = (k, short) => data.comps[k] ? (short ? data.comps[k].short : data.comps[k].name) : k;
   const evTag = (o) => o.ev !== null && o.ev !== undefined
-    ? `<span class="ev ${o.ev > 0 ? "pos" : "neu"}">${o.ev > 0 ? "Value " : ""}${sign(o.ev)}</span>` : "";
+    ? `<span class="ev ${o.ev > 0 ? "pos" : "neu"}" data-tip="Value = Modell-Chance × Quote − 1. Positiv heisst: Die Quote ist höher, als sie laut Modell sein müsste.">${o.ev > 0 ? "Value " : ""}${sign(o.ev)}</span>` : "";
   const quoteTxt = (o) => o.odds ? `Quote ${o.odds.toFixed(2)}` : `faire Quote ${o.fair.toFixed(2)}`;
 
   // ---------- Navigation ----------
@@ -693,18 +726,18 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <div class="match-hero">
         <div class="hero-meta">${esc(compName(u.comp))} · ${esc(fDay.format(d))}, ${fTime.format(d)}${u.neutral ? " · neutraler Platz" : ""}</div>
         <div class="hero-teams">
-          <div class="hero-team">${crest(u.home, "lg")}<span class="tname">${esc(u.home.name)}</span>${formHtml(u.home.form)}</div>
-          <div class="hero-score"><span class="lbl">Resultat-Tipp</span><div class="bug"><span>${u.score[0]}</span><span>${u.score[1]}</span></div><span class="muted" style="font-size:12px">${pct(u.score[2])} wahrscheinlich</span></div>
-          <div class="hero-team">${crest(u.away, "lg")}<span class="tname">${esc(u.away.name)}</span>${formHtml(u.away.form)}</div>
+          <div class="hero-team">${crest(u.home, "lg")}<span class="tname">${esc(u.home.name)}</span>${formHtml(u.home)}</div>
+          <div class="hero-score"><span class="lbl" data-tip="Das wahrscheinlichste Endresultat. Auch das wahrscheinlichste Resultat tritt meist nur in 10 bis 20 % der Fälle ein.">Resultat-Tipp</span><div class="bug"><span>${u.score[0]}</span><span>${u.score[1]}</span></div><span class="muted" style="font-size:12px">${pct(u.score[2])} wahrscheinlich</span></div>
+          <div class="hero-team">${crest(u.away, "lg")}<span class="tname">${esc(u.away.name)}</span>${formHtml(u.away)}</div>
         </div>
         <div class="probs" style="padding:0">
           <div class="bar"><i class="h" style="width:${u.p[0] * 100}%"></i><i class="d" style="width:${u.p[1] * 100}%"></i><i class="a" style="width:${u.p[2] * 100}%"></i></div>
           <div class="legend"><span>1 <b>${pct(u.p[0])}</b></span><span>X <b>${pct(u.p[1])}</b></span><span>2 <b>${pct(u.p[2])}</b></span></div>
         </div>
         <dl class="stats">
-          <div class="stat"><dt>xG</dt><dd>${u.xg[0].toFixed(1)} – ${u.xg[1].toFixed(1)}</dd></div>
-          <div class="stat"><dt>Über 2.5</dt><dd>${pct(u.m["O2.5"])}</dd></div>
-          <div class="stat"><dt>Beide treffen</dt><dd>${pct(u.m.BTTS)}</dd></div>
+          <div class="stat"><dt data-tip="Erwartete Tore: So viele Tore erwartet das Modell für Heim und Gast.">xG</dt><dd>${u.xg[0].toFixed(1)} – ${u.xg[1].toFixed(1)}</dd></div>
+          <div class="stat"><dt data-tip="Chance auf 3 oder mehr Tore im Spiel.">Über 2.5</dt><dd>${pct(u.m["O2.5"])}</dd></div>
+          <div class="stat"><dt data-tip="Chance, dass beide Teams mindestens ein Tor schiessen.">Beide treffen</dt><dd>${pct(u.m.BTTS)}</dd></div>
           ${extra.join("")}
         </dl>
         ${u.known ? "" : `<p class="note" style="margin:0"><b>Unsichere Prognose.</b> Mindestens ein Team hat zu wenig Spiele in den Daten (z. B. Amateurklub im Pokal). Darum keine Value-Tipps und keine Kombi-Vorschläge mit diesem Spiel.</p>`}
@@ -814,9 +847,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (!n) { out.innerHTML = `<div class="panel"><div class="empty"><strong>Keine Wetten</strong>Mit diesen Einstellungen fand der Testlauf keinen Tipp. Versuch ein anderes Risiko, mehr Märkte oder ein früheres Startdatum.</div></div>`; return; }
     out.innerHTML = `<dl class="kpis">
         <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Endkapital</dt><dd>${chf(bank)}<small>Start ${chf(cfg.budget)} CHF</small></dd></div>
-        <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Gewinn</dt><dd>${profit >= 0 ? "+" : ""}${chf(profit)}<small>ROI ${sign(roi)} auf ${chf(staked)} Einsatz</small></dd></div>
+        <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt data-tip="ROI = Gewinn geteilt durch die Summe aller Einsätze.">Gewinn</dt><dd>${profit >= 0 ? "+" : ""}${chf(profit)}<small>ROI ${sign(roi)} auf ${chf(staked)} Einsatz</small></dd></div>
         <div class="kpi"><dt>Wetten</dt><dd>${n}<small>${wins} gewonnen (${pct(wins / n)})</small></dd></div>
-        <div class="kpi"><dt>Grösster Einbruch</dt><dd>${pct(maxDd)}<small>vom Höchststand</small></dd></div>
+        <div class="kpi"><dt data-tip="Der grösste Rückgang vom bisherigen Höchststand des Kontos. Zeigt, wie stark es zwischendurch runterging.">Grösster Einbruch</dt><dd>${pct(maxDd)}<small>vom Höchststand</small></dd></div>
       </dl>
       <div class="panel"><div class="panel-h"><h3>Kapitalverlauf</h3><span class="muted" style="font-size:12.5px">${bank < 1 ? "Budget aufgebraucht" : "CHF"}</span></div><div class="panel-b">${chart(curve, cfg.budget)}</div></div>
       <div class="panel"><div class="panel-h"><h3>Letzte Wetten</h3></div><div class="table-wrap"><table class="rank"><thead><tr><th>Datum</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>
@@ -877,14 +910,24 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#rank-chips").innerHTML = keys.map((k) => `<button class="chip" type="button" data-c="${k}" aria-pressed="${k === rankComp}">${k === "europa" ? "Europa Top 30" : esc(compName(k))}</button>`).join("");
     const rows = data.rankings[rankComp] || [];
     const maxD = Math.max(0.5, ...rows.map((r) => Math.abs(r.gf - r.ga)));
-    $("#rank").innerHTML = `<thead><tr><th class="pos">#</th><th>Team</th>${rankComp === "europa" ? `<th class="hide-sm">Liga</th>` : ""}<th class="num hide-sm">Tore +</th><th class="num hide-sm">Tore −</th><th class="num">Diff.</th><th class="hide-sm">Stärke</th><th>Form</th></tr></thead><tbody>${rows.map((r, i) => {
+    const T = {
+      pos: "Platz im Stärke-Ranking des Modells. Das ist nicht die offizielle Tabelle.",
+      lg: "Liga, in der das Team spielt.",
+      gf: "Tore +: So viele Tore schiesst das Team im Schnitt pro Spiel gegen ein durchschnittliches Team der Top-5-Ligen.",
+      ga: "Tore −: So viele Gegentore kassiert das Team im Schnitt pro Spiel gegen ein durchschnittliches Team.",
+      diff: "Diff.: Tore + minus Tore −. Die erwartete Tordifferenz pro Spiel. Je höher, desto stärker.",
+      str: "Stärke: Die Tordifferenz als Balken. Rechts von der Mitte heisst besser als der Durchschnitt.",
+      form: "Form: Die letzten fünf Pflichtspiele, das neueste rechts. Antippen oder darüberfahren für Gegner und Resultat.",
+    };
+    $("#rank").innerHTML = `<thead><tr><th class="pos" data-tip="${T.pos}">#</th><th>Team</th>${rankComp === "europa" ? `<th class="hide-sm" data-tip="${T.lg}">Liga</th>` : ""}<th class="num hide-sm" data-tip="${T.gf}">Tore +</th><th class="num hide-sm" data-tip="${T.ga}">Tore −</th><th class="num" data-tip="${T.diff}">Diff.</th><th class="hide-sm" data-tip="${T.str}">Stärke</th><th data-tip="${T.form}">Form</th></tr></thead><tbody>${rows.map((r, i) => {
       const diff = r.gf - r.ga, w = Math.abs(diff) / maxD * 50;
+      const dTip = `${esc(r.team.name)} erzielt im Schnitt ${r.gf.toFixed(2)} Tore und kassiert ${r.ga.toFixed(2)} pro Spiel, also ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)} gegen ein Durchschnittsteam.`;
       return `<tr><td class="pos">${i + 1}</td><td><span class="t">${crest(r.team, "sm")}<span>${esc(r.team.name)}</span></span></td>
         ${rankComp === "europa" ? `<td class="hide-sm muted">${esc(compName(r.comp, true))}</td>` : ""}
-        <td class="num hide-sm">${r.gf.toFixed(2)}</td><td class="num hide-sm">${r.ga.toFixed(2)}</td>
-        <td class="num ${diff >= 0 ? "pos-d" : "neg-d"}">${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}</td>
-        <td class="hide-sm"><span class="diffbar"><i style="${diff >= 0 ? `left:50%;width:${w}%;background:var(--good)` : `right:50%;width:${w}%;background:var(--bad)`}"></i></span></td>
-        <td>${formHtml(r.form) || "–"}</td></tr>`; }).join("")}</tbody>`;
+        <td class="num hide-sm" data-tip="${esc(r.team.name)}: ${r.gf.toFixed(2)} erwartete Tore pro Spiel">${r.gf.toFixed(2)}</td><td class="num hide-sm" data-tip="${esc(r.team.name)}: ${r.ga.toFixed(2)} erwartete Gegentore pro Spiel">${r.ga.toFixed(2)}</td>
+        <td class="num ${diff >= 0 ? "pos-d" : "neg-d"}" data-tip="${dTip}">${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}</td>
+        <td class="hide-sm" data-tip="${dTip}"><span class="diffbar"><i style="${diff >= 0 ? `left:50%;width:${w}%;background:var(--good)` : `right:50%;width:${w}%;background:var(--bad)`}"></i></span></td>
+        <td>${formHtml(r.team, r.form) || "–"}</td></tr>`; }).join("")}</tbody>`;
   }
   $("#rank-chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; rankComp = b.dataset.c; renderRanking(); });
 
@@ -898,9 +941,9 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const pickHits = picks.filter((h) => h.pick.hit).length;
     const rate = (a, b) => (b ? pct(a / b) : "–");
     $("#kpis").innerHTML = `
-      <div class="kpi"><dt>Bester Tipp richtig</dt><dd>${rate(pickHits, picks.length)}<small>${pickHits} von ${picks.length}</small></dd></div>
-      <div class="kpi"><dt>1X2 richtig</dt><dd>${rate(hits, done.length)}<small>${hits} von ${done.length}</small></dd></div>
-      <div class="kpi"><dt>Resultat exakt</dt><dd>${rate(exact, done.length)}<small>${exact} von ${done.length}</small></dd></div>
+      <div class="kpi"><dt data-tip="Wie oft der Tipp, den die App pro Spiel als besten zeigt, gestimmt hat.">Bester Tipp richtig</dt><dd>${rate(pickHits, picks.length)}<small>${pickHits} von ${picks.length}</small></dd></div>
+      <div class="kpi"><dt data-tip="Wie oft der wahrscheinlichste Ausgang (Heimsieg, Remis, Auswärtssieg) eingetreten ist.">1X2 richtig</dt><dd>${rate(hits, done.length)}<small>${hits} von ${done.length}</small></dd></div>
+      <div class="kpi"><dt data-tip="Wie oft der Resultat-Tipp genau gestimmt hat.">Resultat exakt</dt><dd>${rate(exact, done.length)}<small>${exact} von ${done.length}</small></dd></div>
       <div class="kpi"><dt>Offen</dt><dd>${data.history.filter((h) => h.result === null).length}<small>nach Abpfiff ausgewertet</small></dd></div>`;
     if (!data.history.length) { $("#log").innerHTML = `<tbody><tr><td><div class="empty"><strong>Noch keine Bilanz</strong>Sobald getippte Spiele gespielt sind, steht hier, ob die Tipps gestimmt haben.</div></td></tr></tbody>`; return; }
     $("#log").innerHTML = `<thead><tr><th class="hide-sm">Datum</th><th>Spiel</th><th>Bester Tipp</th><th class="num">Tipp</th><th class="num">Ergebnis</th></tr></thead><tbody>${data.history.slice(0, 200).map((h) => {
@@ -927,6 +970,45 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   $("#set-markets").addEventListener("change", (e) => { const g = e.target.dataset.g; if (!g) return; settings.groups[g] = e.target.checked; saveSettings(); renderMatches(); });
   $("#set-comps").addEventListener("change", (e) => { const c = e.target.dataset.c; if (!c) return; settings.comps[c] = e.target.checked; saveSettings(); renderMatches(); });
   $("#set-risk").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; settings.risk = b.dataset.v; saveSettings(); renderSettings(); renderMatches(); });
+
+  // ---------- Info-Blasen (Hover am Computer, Antippen am Handy) ----------
+  const tipbox = document.createElement("div");
+  tipbox.className = "tipbox"; tipbox.setAttribute("role", "tooltip"); document.body.appendChild(tipbox);
+  let tipFor = null;
+  function showTip(el) {
+    const html = el.dataset.team ? formTip(el.dataset.team, +el.dataset.i) : esc(el.dataset.tip);
+    if (!html) return;
+    $$(".fm.on").forEach((x) => x.classList.remove("on"));
+    if (el.classList.contains("fm")) el.classList.add("on");
+    tipbox.innerHTML = html; tipFor = el;
+    tipbox.style.left = "0px"; tipbox.style.top = "0px"; tipbox.classList.add("show");
+    const r = el.getBoundingClientRect(), b = tipbox.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+    let left = Math.min(Math.max(12, r.left + r.width / 2 - b.width / 2), vw - b.width - 12);
+    let top = r.top - b.height - 8;
+    if (top < 60) top = r.bottom + 8;
+    tipbox.style.left = left + "px"; tipbox.style.top = top + "px";
+  }
+  function hideTip() { tipbox.classList.remove("show"); tipFor = null; $$(".fm.on").forEach((x) => x.classList.remove("on")); }
+  const tipTarget = (t) => t.closest && t.closest(".fm[data-team], [data-tip]");
+  document.addEventListener("pointerover", (e) => { if (e.pointerType !== "mouse") return; const el = tipTarget(e.target); if (el) showTip(el); });
+  document.addEventListener("pointerout", (e) => { if (e.pointerType !== "mouse") return; const el = tipTarget(e.target); if (el && !el.contains(e.relatedTarget)) hideTip(); });
+  document.addEventListener("click", (e) => {
+    const el = tipTarget(e.target);
+    if (el && (el.classList.contains("fm") || el.matches("th, dt, td, .ev, .lbl, span"))) {
+      if (el.classList.contains("fm") || el.closest("a")) { e.preventDefault(); e.stopPropagation(); }
+      tipFor === el && e.pointerType !== "mouse" ? hideTip() : showTip(el);
+      return;
+    }
+    hideTip();
+  }, true);
+  let lastPointer = 0;
+  document.addEventListener("pointerdown", () => (lastPointer = Date.now()), true);
+  // Tastatur: Fokus zeigt die Blase. Bei Maus/Finger übernimmt der Klick.
+  document.addEventListener("focusin", (e) => { if (Date.now() - lastPointer < 600) return; const el = tipTarget(e.target); if (el) showTip(el); });
+  document.addEventListener("focusout", () => { if (Date.now() - lastPointer > 600) hideTip(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+  window.addEventListener("scroll", hideTip, { passive: true });
+  window.addEventListener("hashchange", hideTip);
 
   // ---------- Start ----------
   function render() {

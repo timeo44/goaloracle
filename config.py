@@ -29,6 +29,17 @@ TRAIN_NATION = [
     "fifa.worldq.conmebol", "fifa.worldq.concacaf", "fifa.worldq.caf", "fifa.worldq.afc",
 ]
 
+# Namen der Trainings-Wettbewerbe (für die Form-Anzeige)
+OTHER_NAMES = {
+    "eng.2": "Championship", "eng.3": "League One", "eng.4": "League Two", "ger.2": "2. Bundesliga",
+    "ita.2": "Serie B", "esp.2": "LaLiga 2", "fra.2": "Ligue 2", "ned.1": "Eredivisie", "por.1": "Liga Portugal",
+    "bel.1": "Pro League", "sco.1": "Premiership", "tur.1": "Süper Lig", "aut.1": "Bundesliga AT",
+    "sui.1": "Super League", "gre.1": "Super League GR", "den.1": "Superliga", "fifa.friendly": "Testspiel",
+    "fifa.worldq.uefa": "WM-Quali", "uefa.euroq": "EM-Quali", "uefa.euro": "EM", "fifa.world": "WM",
+    "fifa.worldq.conmebol": "WM-Quali", "fifa.worldq.concacaf": "WM-Quali", "fifa.worldq.caf": "WM-Quali",
+    "fifa.worldq.afc": "WM-Quali",
+}
+
 # Ligen (nicht Pokale): Teams darin bekommen kein "schwach"-Vorwissen
 LEAGUE_SLUGS = {"eng.1", "esp.1", "ger.1", "ita.1", "fra.1", *TRAIN_CLUB_LEAGUES}
 TOP5 = ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1"]
