@@ -23,7 +23,8 @@ Alle 2 Stunden aktualisiert der Bot Resultate, Spielpläne, Bilanz und Prognosen
 `https://<github-name>.github.io/goaloracle/`
 
 - **Spiele**: alle Spiele der nächsten 7 Tage, antippen für beste Tipps, beste Kombis, alle Märkte und die Resultat-Heatmap. Oben Kombi-Vorschläge über mehrere Spiele.
-- **Testlauf**: *Rückblick simulieren* (Budget, Risiko, Einsatzart, Einzel- oder Kombiwetten über die letzten Saisons mit echten historischen Quoten) und *Spielgeld-Konto* (virtuelles Konto, das ab dem ersten Lauf täglich mitwettet).
+- **Top 5**: die fünf Bets des Tages. Werden jeden Morgen um 10:00 festgelegt, per Telegram verschickt und danach nicht mehr verändert. Dazu die Bilanz (Trefferquote, Gewinn in Einheiten, ROI, Tage mit allen 5 richtig), live und nachträglich berechnet (`web/botd.json`).
+- **Testlauf** (unter Einstellungen): *Rückblick simulieren* (Budget, Risiko, Einsatzart, Einzel- oder Kombiwetten über die letzten Saisons mit echten historischen Quoten) und *Spielgeld-Konto* (virtuelles Konto, das ab dem ersten Lauf täglich mitwettet).
 - **Ranking**: Europa Top 30 und Stärke-Tabellen der Top-5-Ligen.
 - **Bilanz**: jeder Tipp wird nach dem Spiel ausgewertet.
 - **Einstellungen** (Regler-Symbol oben rechts): Tipp-Arten ein/aus (Ecken und Karten standardmässig aus), Wettbewerbe, Risikoprofil. Gilt pro Gerät.

@@ -19,6 +19,7 @@ import requests
 
 import config as C
 import engine as E
+import botd as B
 import tuning as T
 from predictor import Params, Predictor
 from sources import crests, espn, fdcouk, oddsapi
@@ -61,31 +62,41 @@ def write_json(p: Path, data):
     p.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
 
 
-def telegram_text(singles, legs, now, site):
-    when = lambda u: f"{WD[E.parse_date(u['kickoff']).astimezone(TZ).weekday()]} {E.parse_date(u['kickoff']).astimezone(TZ):%H:%M}"
-    comp = lambda u: C.DISPLAY[u["comp"]][1]
-    lines = [f"⚽🔮 <b>GOALORACLE</b> · Top-Tipps\n{now.astimezone(TZ):%d.%m.%Y}"]
-    if not singles:
-        lines.append("Heute und morgen keine Spiele in den abgedeckten Wettbewerben.")
-    for i, u in enumerate(singles, 1):
-        pk = u["pick"]
-        h, a = html.escape(u["home"]["name"]), html.escape(u["away"]["name"])
-        quote = f"Quote {pk['odds']:.2f} · Value {pk['ev']:+.0%}" if pk.get("ev") is not None \
-            else f"faire Quote {pk['fair']:.2f}"
-        lines.append(f"<b>{i}. {html.escape(label(pk['key'], u['home']['name'], u['away']['name']))}</b>\n"
-                     f"{h} – {a} · {comp(u)} · {when(u)}\n"
-                     f"Chance {pk['p']:.0%} · {quote}")
-    if len(legs) >= 2:
-        prob = 1.0
-        txt = []
-        for u, k, p in legs:
-            prob *= p
-            txt.append(f"• {html.escape(label(k, u['home']['name'], u['away']['name']))} "
-                       f"({html.escape(u['home']['tla'])}–{html.escape(u['away']['tla'])}, {p:.0%})")
-        lines.append("<b>🧩 Kombi des Tages</b>\n" + "\n".join(txt) +
-                     f"\nGesamtchance {prob:.0%} · faire Quote {1 / prob:.2f}")
+def telegram_text(day: dict | None, state: dict, now, site):
+    """Nachricht mit den 5 Bets des Tages und der Bilanz von gestern."""
+    lines = [f"⚽🔮 <b>GOALORACLE</b> · Bets des Tages\n{WD[now.astimezone(TZ).weekday()]} {now.astimezone(TZ):%d.%m.%Y}"]
+    bets = (day or {}).get("bets", [])
+    if not bets:
+        lines.append("Heute keine verlässlichen Spiele in den abgedeckten Wettbewerben.")
+    tot_p, tot_q = 1.0, 1.0
+    for i, b in enumerate(bets, 1):
+        ko = E.parse_date(b["kickoff"]).astimezone(TZ)
+        h, a = b["home"]["name"], b["away"]["name"]
+        q = b.get("odds") or b["fair"]
+        tot_p *= b["p"]
+        tot_q *= q
+        quote = f"Quote {b['odds']:.2f}" + (f" · Value {b['ev']:+.0%}" if b.get("ev") is not None and b["ev"] > 0 else "") \
+            if b.get("odds") else f"faire Quote {b['fair']:.2f}"
+        lines.append(f"<b>{i}. {html.escape(label(b['key'], h, a))}</b>\n"
+                     f"{html.escape(h)} – {html.escape(a)} · {C.DISPLAY[b['comp']][1]} · {WD[ko.weekday()]} {ko:%H:%M}\n"
+                     f"Chance {b['p']:.0%} · {quote}")
+    if len(bets) >= 2:
+        lines.append(f"<b>Alle {len(bets)} als Kombi:</b> Chance {tot_p:.1%} · Quote {tot_q:.2f}")
+    # gestern
+    prev = next((d for d in state.get("days", []) if not d.get("retro") and d["day"] < now.astimezone(TZ).date().isoformat()), None)
+    if prev:
+        done = [x for x in prev["bets"] if isinstance(x.get("hit"), bool)]
+        if done:
+            won = sum(x["hit"] for x in done)
+            wo = [x for x in done if x.get("odds")]
+            units = sum((x["odds"] - 1) if x["hit"] else -1 for x in wo)
+            lines.append(f"Gestern: {won} von {len(done)} richtig" + (f" ({units:+.2f} Einheiten)" if wo else ""))
+    S = state.get("stats_live") or {}
+    if S.get("bets"):
+        lines.append(f"Bilanz seit Start: {S['hits']}/{S['bets']} richtig" +
+                     (f" · {S['profit']:+.2f} Einheiten" if S.get("with_odds") else ""))
     if site:
-        lines.append(f'Alle Spiele, Kombis und Testlauf: <a href="{site}">{site}</a>')
+        lines.append(f'Alle Spiele und Details: <a href="{site}#top5">{site}</a>')
     lines.append("<i>Statistisches Modell, keine Garantie. Wette nur, was du verlieren kannst.</i>")
     return "\n\n".join(lines)
 
@@ -177,6 +188,12 @@ def main():
                                    extra_ids=form_ids, extra_since=now - timedelta(days=400))
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
+    # Bets des Tages: um 10 Uhr (bzw. beim ersten Lauf danach) festlegen, danach nur auswerten
+    local_now = now.astimezone(TZ)
+    create = args.notify or args.dry_run or local_now.hour >= 10
+    botd_state, new_day = B.update(load_json(WEB / "botd.json", None), upcoming, history, by_id, now, create)
+    if new_day:
+        print(f"Bets des Tages festgelegt: {len(new_day['bets'])} Tipps")
 
     slugs_with_data = {e["slug"] for e in events if e["completed"]}
     data = {
@@ -199,6 +216,8 @@ def main():
         },
         "upcoming": upcoming, "rankings": rankings,
         "history_summary": E.history_summary(history),
+        "botd_today": next((d for d in botd_state["days"] if not d.get("retro") and d["day"] == B.local_day(now)), None),
+        "botd_stats": {k: botd_state[k] for k in ("stats_live", "stats_retro", "stats_all")},
         "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
     data["forms"] = {t: fdet[t] for t in shown if t in fdet}
@@ -210,6 +229,7 @@ def main():
     data["crests"] = sorted(crests.sync({t: info[t] for t in crest_ids if t in info}, WEB / "crests"))
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
+    write_json(WEB / "botd.json", botd_state)
     write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
     if not args.skip_sim:
         sim_rows = E.build_sim(events, now, params, tuned_rows)
@@ -220,9 +240,10 @@ def main():
 
     if not args.notify and not args.dry_run:
         return
-    singles, legs = E.top_tips(upcoming, now)
     site = os.getenv("SITE_URL", "")
-    text = telegram_text(singles, legs, now, site)
+    today = B.local_day(now)
+    day = next((d for d in botd_state["days"] if not d.get("retro") and d["day"] == today), None)
+    text = telegram_text(day, botd_state, now, site)
     token, chat = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
     if args.dry_run or not token or not chat:
         print(text)

@@ -384,6 +384,39 @@ form.sim { display: grid; gap: 14px; }
 .btn { appearance: none; border: 0; border-radius: var(--radius); background: var(--home); color: var(--surface); font: 700 17px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: 13px 16px; cursor: pointer; }
 @media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
 .btn:disabled { opacity: .55; cursor: progress; }
+.tl-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px; color: inherit; text-decoration: none; }
+.tl-link > svg:first-child { width: 22px; height: 22px; flex: none; color: var(--muted); }
+.tl-link span { flex: 1; min-width: 0; }
+.tl-link small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.tl-link .arrow { width: 18px; height: 18px; color: var(--muted); flex: none; }
+@media (hover: hover) { .tl-link:hover { border-color: var(--muted); } }
+.t5-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+.t5-head h2 { margin: 0; font: 700 26px/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .01em; }
+.t5-head span { color: var(--muted); font-size: 13px; }
+.t5 { display: grid; gap: 10px; }
+.t5 .pick { grid-template-columns: auto 1fr; column-gap: 12px; align-items: start; }
+.t5 .pick > * { grid-column: 2; }
+.t5 .no { grid-column: 1; grid-row: 1 / span 3; font: 700 30px/1 var(--font-display); color: var(--muted); width: 22px; text-align: center; padding-top: 1px; }
+.t5 .pick.won { border-color: color-mix(in srgb, var(--good) 55%, var(--line)); }
+.t5 .pick.lost { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.t5 .pick.won .no { color: var(--good); } .t5 .pick.lost .no { color: var(--bad); }
+.t5-combo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--radius); font-size: 13px; color: var(--muted); }
+.t5-combo b { font: 700 20px/1 var(--font-display); color: var(--ink); margin-left: 4px; }
+.t5-day { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.t5-day summary { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.t5-day summary::-webkit-details-marker { display: none; }
+.t5-day summary .d { flex: 1; min-width: 0; font-weight: 600; }
+.t5-day summary .d small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.t5-day summary .dots { display: flex; gap: 4px; }
+.t5-day summary .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--sunken); }
+.t5-day summary .dots i.w { background: var(--good); } .t5-day summary .dots i.l { background: var(--bad); }
+.t5-day summary svg { width: 16px; height: 16px; color: var(--muted); transition: transform .15s; }
+.t5-day[open] summary svg { transform: rotate(180deg); }
+.t5-day ol { list-style: none; margin: 0; padding: 0 14px 10px; }
+.t5-day li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.t5-day li a { color: inherit; text-decoration: none; min-width: 0; }
+.t5-day li .m { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t5-day li .r { text-align: right; font-size: 12.5px; color: var(--muted); }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
 .kpi dt { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
@@ -480,8 +513,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Spiele</button>
       <button class="tab" role="tab" data-view="tipps" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z"/><path d="M14 5v12" stroke-dasharray="2 2"/></svg>Tipps</button>
-      <button class="tab" role="tab" data-view="testlauf" aria-selected="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Testlauf</button>
+      <button class="tab" role="tab" data-view="top5" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></svg>Top 5</button>
       <button class="tab" role="tab" data-view="ranking" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Ranking</button>
       <button class="tab" role="tab" data-view="bilanz" aria-selected="false">
@@ -527,7 +560,22 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     <div id="tp-out" style="margin-top:14px"></div>
   </section>
 
+  <section class="view" id="view-top5" hidden>
+    <div id="t5-today"></div>
+    <h2 class="sec" style="margin-top:28px">Bilanz der Bets des Tages</h2>
+    <div class="chips" id="t5-kind" role="group" aria-label="Art">
+      <button type="button" class="chip" data-v="all" aria-pressed="true">Alle</button>
+      <button type="button" class="chip" data-v="live" aria-pressed="false">Live getippt</button>
+      <button type="button" class="chip" data-v="retro" aria-pressed="false">Nachträglich</button>
+    </div>
+    <dl class="kpis" id="t5-kpis"></dl>
+    <p class="note" id="t5-note"></p>
+    <div id="t5-days" style="display:grid;gap:12px;margin-top:14px"></div>
+    <button type="button" class="chip" id="t5-more" style="margin:12px auto 0;display:block" hidden>Mehr anzeigen</button>
+  </section>
+
   <section class="view" id="view-testlauf" hidden>
+    <button class="back" type="button" id="tl-back">← Einstellungen</button>
     <div class="chips" role="group" aria-label="Testlauf-Art">
       <button class="chip" type="button" id="tl-sim" aria-pressed="true">Rückblick simulieren</button>
       <button class="chip" type="button" id="tl-paper" aria-pressed="false">Spielgeld-Konto</button>
@@ -590,6 +638,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-einstellungen" hidden>
+    <a class="panel tl-link" href="#testlauf">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
+      <span><b>Testlauf</b><small>Rückblick simulieren mit Budget und Risiko, oder das Spielgeld-Konto ansehen</small></span>
+      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </a>
     <div class="panel" id="model-panel" style="margin-bottom:16px">
       <div class="panel-h"><h3>Modell</h3><span class="muted" style="font-size:12.5px" id="mdl-stamp"></span></div>
       <div class="model-grid">
@@ -755,6 +808,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     return fetch("history.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : { history: [] }))
       .then((d) => (history = d.history || (data && data.history) || [])).catch(() => (history = (data && data.history) || []));
   }
+  let botd = null;
+  function loadBotd() {
+    if (botd) return Promise.resolve(botd);
+    if (window.GO_BOTD) return Promise.resolve((botd = window.GO_BOTD));
+    return fetch("botd.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : { days: [] }))
+      .then((d) => (botd = d)).catch(() => ({ days: [] }));
+  }
   let settings = null;
   let compFilter = store.get("go-comp") || "all";
   let rankComp = "europa";
@@ -834,11 +894,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const quoteTxt = (o) => o.odds ? `Quote ${o.odds.toFixed(2)}` : `faire Quote ${o.fair.toFixed(2)}`;
 
   // ---------- Navigation ----------
-  const VIEWS = ["spiele", "spiel", "team", "tipps", "testlauf", "ranking", "bilanz", "einstellungen"];
+  const VIEWS = ["spiele", "spiel", "team", "tipps", "top5", "testlauf", "ranking", "bilanz", "einstellungen"];
   let lastList = "spiele";
   // Jeder Bereich wird erst gebaut, wenn er sichtbar wird (spart Rechenzeit auf dem Handy)
   const dirty = new Set();
-  const RENDER = { spiele: () => renderMatches(), tipps: () => renderTipps(), ranking: () => renderRanking(),
+  const RENDER = { spiele: () => renderMatches(), top5: () => renderTop5(), tipps: () => renderTipps(), ranking: () => renderRanking(),
     bilanz: () => renderBilanz(), einstellungen: () => { renderSettings(); renderModel(); } };
   function markDirty(...views) { (views.length ? views : Object.keys(RENDER)).forEach((v) => dirty.add(v)); renderVisible(); }
   let currentView = null;
@@ -856,11 +916,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (prev && prev !== v && (prev === "spiel" || prev === "team") && scrollMem[v] != null) requestAnimationFrame(() => window.scrollTo(0, scrollMem[v]));
     const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v;
     $$(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === tabV)));
-    $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
+    $("#gear").setAttribute("aria-pressed", String(v === "einstellungen" || v === "testlauf"));
     if (v === "spiel") renderDetail(h.slice(6));
     if (v === "team") renderTeam(h.slice(5));
     if (v === "testlauf") ensureSim();
-    if (v !== "spiel" && v !== "team" && v !== "einstellungen") lastList = v;
+    if (v !== "spiel" && v !== "team" && v !== "einstellungen" && v !== "testlauf") lastList = v;
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => {
     if (location.hash.slice(1) === b.dataset.view) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
@@ -873,7 +933,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (btn.classList.contains("spin")) return;
     btn.classList.add("spin");
     const fresh = (u) => fetch(u, { cache: "reload" }).catch(() => null);
-    const files = [location.pathname, "data.json", "paper.json", "history.json", "sim.json", "manifest.webmanifest"];
+    const files = [location.pathname, "data.json", "paper.json", "history.json", "sim.json", "botd.json", "manifest.webmanifest"];
     try {
       await Promise.race([Promise.all(files.map(fresh)), new Promise((res) => setTimeout(res, 6000))]);
       if ("caches" in window) { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); }
@@ -883,6 +943,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   // Nach dem Neuladen die Adresse bereinigen
   if (/[?&]r=\d+/.test(location.search)) window.history.replaceState(null, "", location.pathname + location.hash);
   $("#gear").addEventListener("click", () => { location.hash = location.hash === "#einstellungen" ? lastList : "einstellungen"; window.scrollTo(0, 0); });
+  $("#tl-back").addEventListener("click", () => { location.hash = "einstellungen"; window.scrollTo(0, 0); });
   window.addEventListener("hashchange", () => { route(); });
 
   // ---------- Spiele ----------
@@ -1078,6 +1139,90 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     out.innerHTML = `<h2 class="sec">${sets.length} Vorschläge · ${tp.legs} Spiele pro Kombi</h2><div class="slips">${sets.map(slipHtml).join("")}</div>
       <p class="note">Die Gesamtchance ist das Produkt der Einzelchancen. Je mehr Spiele, desto höher die Quote, aber desto seltener geht die Kombi auf.</p>`;
   }
+
+  // ---------- Top 5 (Bets des Tages) ----------
+  let t5Kind = "all", t5Shown = 14;
+  const keyOk = (b) => ({ k: b.key, p: b.p, odds: b.odds, fair: b.fair || 1 / b.p, ev: b.ev });
+  function betState(b) {
+    if (b.result === "void") return ["void", "Abgesagt"];
+    if (b.result === "et") return ["void", "n. V."];
+    if (b.hit === true) return ["won", "✓ " + b.result.join(":")];
+    if (b.hit === false) return ["lost", "✗ " + b.result.join(":")];
+    const t = new Date(b.kickoff).getTime(), now = Date.now();
+    if (now >= t && now < t + 2.2 * 3600e3) return ["open", "Läuft"];
+    if (now >= t) return ["open", "Auswertung folgt"];
+    return ["open", "Offen"];
+  }
+  function remember(b) {
+    knownMatches[b.id] = knownMatches[b.id] || { id: b.id, comp: b.comp, kickoff: b.kickoff, home: b.home, away: b.away,
+      tips: [{ key: b.key, p: b.p, odds: b.odds, hit: b.hit }] };
+  }
+  function t5Card(b, i) {
+    remember(b);
+    const o = keyOk(b), d = new Date(b.kickoff), [cls, txt] = betState(b);
+    return `<a class="pick ${cls}" href="#spiel-${esc(b.id)}"><span class="no">${i + 1}</span>
+      <div class="pick-top"><span class="what">${esc(label(b.key, b))}</span><span class="chance">${pct(b.p)}<small>Chance</small></span></div>
+      <div class="pick-match">${crest(b.home, "sm")}${crest(b.away, "sm")}<span>${esc(b.home.name)} – ${esc(b.away.name)}</span></div>
+      <div class="pick-foot"><span class="q">${(b.odds || o.fair).toFixed(2)}</span><span>${b.odds ? "Quote" : "faire Quote"}</span>${evTag(o)}<span>· ${esc(compName(b.comp, true))} · ${esc(fShort.format(d))} ${fTime.format(d)}</span><span class="status ${cls}" style="margin-left:auto">${esc(txt)}</span></div>
+    </a>`;
+  }
+  function t5Today(day) {
+    const el = $("#t5-today"), now = new Date();
+    const todayIso = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Zurich" }).format(now);
+    if (!day) {
+      el.innerHTML = `<div class="t5-head"><h2>Bets des Tages</h2><span>${esc(fDay.format(now))}</span></div>
+        <div class="empty"><strong>Die Tipps kommen um 10:00</strong>Jeden Morgen legt GoalOracle fünf Tipps fest und schickt sie per Telegram. Sie erscheinen dann hier.</div>`;
+      return;
+    }
+    const isToday = day.day === todayIso;
+    const odds = day.bets.reduce((a, b) => a * (b.odds || b.fair), 1), p = day.bets.reduce((a, b) => a * b.p, 1);
+    const done = day.bets.filter((b) => typeof b.hit === "boolean"), won = done.filter((b) => b.hit).length;
+    el.innerHTML = `<div class="t5-head"><h2>${isToday ? "Bets des Tages" : "Letzte Bets des Tages"}</h2>
+        <span>${esc(fDay.format(new Date(day.day + "T12:00:00")))} · festgelegt ${fTime.format(new Date(day.created))}${done.length ? ` · ${won} von ${done.length} richtig` : ""}</span></div>
+      ${isToday ? "" : `<p class="note" style="margin:-4px 0 12px">Die neuen Tipps kommen um 10:00.</p>`}
+      <div class="picks t5">${day.bets.map(t5Card).join("")}</div>
+      <div class="t5-combo"><span>Alle ${day.bets.length} als Kombi</span><span>Chance <b>${(p * 100).toFixed(p < 0.1 ? 1 : 0)}%</b></span><span>Quote <b>${odds.toFixed(2)}</b></span></div>
+      <p class="note">Dieselben Tipps wie in der Telegram-Nachricht. Pro Spiel der beste Tipp (Value zuerst, sonst die höchste Chance im Quotenbereich 1.40–3.20), höchstens zwei pro Wettbewerb. Einmal festgelegt, ändern sie sich nicht mehr.</p>`;
+  }
+  function t5Kpis(s, kind) {
+    const rate = s.bets ? Math.round(100 * s.hits / s.bets) + "%" : "–";
+    const prof = s.with_odds ? (s.profit > 0 ? "+" : s.profit < 0 ? "−" : "") + Math.abs(s.profit).toFixed(1) : "–";
+    $("#t5-kpis").innerHTML = `
+      <div class="kpi"><dt data-tip="Anteil der ausgewerteten Bets des Tages, die richtig waren.">Trefferquote</dt><dd>${rate}<small>${s.hits} von ${s.bets}</small></dd></div>
+      <div class="kpi ${s.with_odds ? (s.profit >= 0 ? "good" : "bad") : ""}"><dt data-tip="Gewinn bei 1 Einheit Einsatz pro Tipp. Gezählt werden nur Tipps mit echter Buchmacher-Quote.">Gewinn</dt><dd>${prof}<small>Einheiten · ${s.with_odds} Tipps mit Quote</small></dd></div>
+      <div class="kpi"><dt data-tip="Gewinn geteilt durch Einsatz (Return on Investment).">ROI</dt><dd>${s.roi == null ? "–" : sign(s.roi)}<small>pro eingesetzte Einheit</small></dd></div>
+      <div class="kpi"><dt data-tip="Tage, an denen alle fünf Tipps aufgegangen sind, also auch die 5er-Kombi.">Alle 5 richtig</dt><dd>${s.perfect_days}<small>von ${s.days} Tagen</small></dd></div>`;
+    $("#t5-note").textContent = kind === "retro" ? "Nachträglich: so hätte GoalOracle an früheren Tagen gewählt, berechnet nur mit Daten vor dem jeweiligen Spiel."
+      : kind === "live" ? "Live getippt: jeweils um 10:00 festgelegt und per Telegram verschickt."
+      : "Live getippte und nachträglich berechnete Tage zusammen.";
+  }
+  function t5Day(d) {
+    d.bets.forEach(remember);
+    const done = d.bets.filter((b) => typeof b.hit === "boolean"), won = done.filter((b) => b.hit).length;
+    const dots = d.bets.map((b) => `<i class="${b.hit === true ? "w" : b.hit === false ? "l" : ""}"></i>`).join("");
+    return `<details class="t5-day"><summary><span class="d">${esc(fDay.format(new Date(d.day + "T12:00:00")))}<small>${d.retro ? "nachträglich" : "live"} · ${done.length ? `${won} von ${done.length} richtig` : "noch offen"}</small></span><span class="dots" aria-hidden="true">${dots}</span>${chev}</summary>
+      <ol>${d.bets.map((b) => { const [cls, txt] = betState(b); return `<li><a href="#spiel-${esc(b.id)}"><b>${esc(label(b.key, b))}</b><div class="m">${esc(b.home.name)} – ${esc(b.away.name)} · ${esc(compName(b.comp, true))}</div></a>
+        <span class="r"><span class="status ${cls}">${esc(txt)}</span><br>${b.odds ? "Quote " + b.odds.toFixed(2) : "fair " + (b.fair || 1 / b.p).toFixed(2)}</span></li>`; }).join("")}</ol></details>`;
+  }
+  function renderTop5() {
+    $$("#t5-kind .chip").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === t5Kind)));
+    const S = data.botd_stats || {};
+    t5Today(data.botd_today || null);
+    t5Kpis(S["stats_" + t5Kind] || { bets: 0, hits: 0, with_odds: 0, profit: 0, roi: null, days: 0, perfect_days: 0 }, t5Kind);
+    $("#t5-days").innerHTML = `<div class="empty">Verlauf wird geladen …</div>`;
+    loadBotd().then((B) => {
+      if (currentView !== "top5") { dirty.add("top5"); return; }
+      const all = B.days || [];
+      if (!data.botd_today) { const last = all.find((d) => !d.retro); if (last) t5Today(last); }
+      const todayId = data.botd_today && data.botd_today.day;
+      const list = all.filter((d) => !(d.day === todayId && !d.retro) && (t5Kind === "all" || (t5Kind === "retro") === !!d.retro));
+      $("#t5-days").innerHTML = list.length ? list.slice(0, t5Shown).map(t5Day).join("")
+        : `<div class="empty"><strong>Noch keine früheren Tage</strong>Ab morgen erscheint hier jeder Tag mit dem Ergebnis.</div>`;
+      $("#t5-more").hidden = list.length <= t5Shown;
+    });
+  }
+  $("#t5-kind").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; t5Kind = b.dataset.v; t5Shown = 14; renderTop5(); });
+  $("#t5-more").addEventListener("click", () => { t5Shown += 14; renderTop5(); });
 
   // ---------- Spiel-Detail ----------
   function heatmap(u) {
@@ -1858,7 +2003,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       const [d, p] = await Promise.all([
         fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((r) => r.json()),
         fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
-      data = d; paper = p; history = null; sim = null; simReady = false;
+      data = d; paper = p; history = null; botd = null; sim = null; simReady = false;
       render();
       setRunStatus(`<span class="pos-d">Aktualisiert</span> · Stand ${esc(fStamp.format(new Date(data.generated)))}`);
     } catch (e) { setRunStatus("Fertig. Lade die Seite neu, um die neuen Daten zu sehen."); }
@@ -1936,7 +2081,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         if (!data || d.generated === data.generated) return;
         const p = await fetch("paper.json?v=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         const y = window.scrollY, h = location.hash;
-        data = d; paper = p; history = null; sim = null; simReady = false;
+        data = d; paper = p; history = null; botd = null; sim = null; simReady = false;
         render();
         if (location.hash === h) window.scrollTo(0, y);
       } catch (e) { /* nächster Versuch in 10 Minuten */ }
