@@ -61,7 +61,7 @@ body { overscroll-behavior-y: none; text-rendering: optimizeSpeed; }
 .day, .slips, .picks, #view-bilanz .panel, #view-team .panel { content-visibility: auto; contain-intrinsic-size: auto 600px; }
 .card, .pick, .slip, .kpi { contain: layout paint; }
 /* Rückmeldung beim Antippen */
-.card:active, .pick:active, a.leg:active { transform: scale(.985); }
+.card:active, .picks .pick:active, a.leg:active { transform: scale(.985); }
 .chip:active, .tab:active, .btn:active, .seg button:active, .gear:active, .back:active { transform: scale(.96); }
 .card, .pick, .chip, .tab, .btn, .seg button, .gear { transition: transform .08s ease-out, border-color .12s; }
 tr[data-href]:active td { background: var(--sunken); }
@@ -80,6 +80,10 @@ body {
   font: 400 15px/1.5 var(--font-body); font-variant-numeric: tabular-nums;
   padding-bottom: calc(var(--nav-h) + max(4px, calc(env(safe-area-inset-bottom, 0px) - 14px)));
 }
+/* Seite immer mindestens bildschirmhoch, damit iOS die untere Leiste nicht hochschiebt */
+body { min-height: 100vh; min-height: calc(100dvh - env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; width: 100%; }
+body > header, body > footer { flex: none; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--home); outline-offset: 2px; }
@@ -127,6 +131,8 @@ nav.tabs + #reload { margin-left: 0; }
     background: var(--surface); border-top: 1px solid var(--line);
     padding: 4px max(6px, env(safe-area-inset-left, 0px)) max(4px, calc(env(safe-area-inset-bottom, 0px) - 14px)) max(6px, env(safe-area-inset-right, 0px));
   }
+  /* Hintergrund der Leiste nach unten verlängern: kein grauer Streifen, falls iOS sie anhebt */
+  nav.tabs::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 160px; background: var(--surface); }
   .tab { flex: 1; flex-direction: column; gap: 3px; font-size: 11.5px; padding: 6px 2px; letter-spacing: .05em; }
   .tab svg { display: block; }
   .tab[aria-selected="true"] { box-shadow: none; color: var(--home); }
@@ -160,8 +166,8 @@ h2.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .tipbar { display: grid; gap: 10px; }
 @media (min-width: 760px) { .tipbar { grid-template-columns: auto 1fr; align-items: center; } .tipbar #tp-legs { grid-column: 1 / -1; } }
 .picks { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
-.pick { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; text-decoration: none; color: inherit; min-width: 0; }
-@media (hover: hover) { .pick:hover { border-color: var(--muted); } }
+.picks .pick { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; text-decoration: none; color: inherit; min-width: 0; }
+@media (hover: hover) { .picks .pick:hover { border-color: var(--muted); } }
 .pick-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .pick-top .what { font-weight: 700; font-size: 16px; }
 .pick-top .chance { font: 700 24px/1 var(--font-display); text-align: right; }
@@ -206,8 +212,8 @@ h2.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .bar .h { background: var(--home); } .bar .d { background: var(--draw); } .bar .a { background: var(--away); }
 .legend { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .legend b { font-weight: 600; color: var(--ink); }
-.legend .pick { color: var(--ink); font-weight: 700; }
-.legend .pick b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.legend .sel { color: var(--ink); font-weight: 700; }
+.legend .sel b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .card-foot { border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; padding: 9px 14px; min-width: 0; }
 .best { min-width: 0; flex: 1; display: grid; gap: 1px; }
 .best .what { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -901,7 +907,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   function card(u) {
     const d = new Date(u.kickoff), [p1, px, p2] = u.p, pk = bestPick(u);
-    const leg = (k, p) => `<span class="${u.tip === k ? "pick" : ""}">${k} <b>${pct(p)}</b></span>`;
+    const leg = (k, p) => `<span class="${u.tip === k ? "sel" : ""}">${k} <b>${pct(p)}</b></span>`;
     const foot = pk
       ? `<div class="best"><span class="what">${esc(label(pk.k, u))}</span><span class="meta">Chance ${pct(pk.p)} · ${quoteTxt(pk)}</span></div>${evTag(pk)}`
       : `<div class="best"><span class="meta">Kein Tipp im gewählten Risikobereich</span></div>`;
@@ -1010,6 +1016,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const tpSet = (k, v) => { tp[k] = v; store.set("go-tp", tp); renderTipps(); };
   $("#tp-kind").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) tpSet("kind", b.dataset.v); });
   $("#tp-when").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("hours", +b.dataset.v); });
+  $("#tp-out").addEventListener("click", (e) => { if (e.target.closest("#tp-week")) tpSet("hours", 168); });
   $("#tp-legs").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("legs", +b.dataset.v); });
 
   function tipCandidates() {
@@ -1052,7 +1059,12 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#tp-note").innerHTML = `Risiko <b>${esc(settings.risk)}</b> (Quoten ${R.min_odds}–${R.max_odds}) und deine Tipp-Arten aus den <a href="#einstellungen" style="color:inherit">Einstellungen</a>. Spiele mit unsicherer Prognose sind ausgeschlossen.`;
     const cands = tipCandidates();
     const out = $("#tp-out");
-    if (!cands.length) { out.innerHTML = `<div class="empty"><strong>Keine Tipps</strong>Im gewählten Zeitraum gibt es keine passenden Spiele. Wähl einen längeren Zeitraum oder ein anderes Risiko.</div>`; return; }
+    if (!cands.length) {
+      const save = tp.hours; tp.hours = 168; const wk = tipCandidates().length; tp.hours = save;
+      const unsure = visibleMatches().filter((u) => !u.known && new Date(u.kickoff).getTime() <= Date.now() + tp.hours * 3600e3 && new Date(u.kickoff).getTime() > Date.now()).length;
+      out.innerHTML = `<div class="empty"><strong>Keine Tipps in ${tp.hours} Stunden</strong>${unsure ? `${unsure} Spiel${unsure > 1 ? "e haben" : " hat"} eine unsichere Prognose (z. B. Amateurklub im Pokal) und ${unsure > 1 ? "sind" : "ist"} darum ausgeschlossen. ` : ""}${wk && tp.hours < 168 ? `In den nächsten 7 Tagen gibt es ${wk} Spiele mit Tipps.<br><button type="button" class="chip" id="tp-week" style="margin-top:14px">7 Tage anzeigen</button>` : "Wähl ein anderes Risiko in den Einstellungen."}</div>`;
+      return;
+    }
     if (tp.kind === "single") {
       const all = [];
       cands.forEach(({ u, opts }) => opts.slice(0, 2).forEach((o, i) => all.push({ u, o, i })));
