@@ -1,5 +1,5 @@
 name: GoalOracle
-run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || 'Manueller Lauf' }}
+run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || (inputs.send_only && 'Top 5 an Telegram' || 'Manueller Lauf') }}
 
 on:
   schedule:
@@ -23,6 +23,10 @@ on:
         default: false
       retune:
         description: "Modell-Einstellungen neu optimieren (dauert 5–10 Minuten)"
+        type: boolean
+        default: false
+      send_only:
+        description: "Nur die heutigen Top 5 an Telegram senden (ohne Rechnen)"
         type: boolean
         default: false
 
@@ -59,7 +63,10 @@ jobs:
             if [ "${{ inputs.notify }}" = "true" ]; then ARGS="$ARGS --notify"; fi
             if [ "${{ inputs.refresh_odds }}" = "true" ]; then ARGS="$ARGS --refresh-odds"; fi
             if [ "${{ inputs.retune }}" = "true" ]; then ARGS="$ARGS --retune"; fi
+            if [ "${{ inputs.send_only }}" = "true" ]; then ARGS="--send-only"; fi
           fi
+          SEND=false; case "$ARGS" in *--send-only*) SEND=true;; esac
+          echo "send=$SEND" >> "$GITHUB_OUTPUT"
           echo "run=$RUN" >> "$GITHUB_OUTPUT"
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
           echo "Lauf: $RUN, Optionen: $ARGS"
@@ -98,11 +105,11 @@ jobs:
           done
 
       - uses: actions/configure-pages@v6
-        if: steps.plan.outputs.run == 'true'
+        if: steps.plan.outputs.run == 'true' && steps.plan.outputs.send != 'true'
       - uses: actions/upload-pages-artifact@v5.0.0
-        if: steps.plan.outputs.run == 'true'
+        if: steps.plan.outputs.run == 'true' && steps.plan.outputs.send != 'true'
         with:
           path: web
       - id: deployment
-        if: steps.plan.outputs.run == 'true'
+        if: steps.plan.outputs.run == 'true' && steps.plan.outputs.send != 'true'
         uses: actions/deploy-pages@v5.0.0

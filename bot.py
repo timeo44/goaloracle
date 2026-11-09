@@ -114,6 +114,31 @@ def wait_until(hhmm: str, max_minutes: int = 45):
         time.sleep(wait)
 
 
+def send_only(now) -> int:
+    """Heutige Top 5 (so wie sie um 10 Uhr festgelegt wurden) nochmals an Telegram schicken."""
+    state = load_json(WEB / "botd.json", None) or {"days": []}
+    today = B.local_day(now)
+    day = next((d for d in state["days"] if not d.get("retro") and d["day"] == today), None)
+    if not day:
+        print("Für heute sind noch keine Top 5 festgelegt (das passiert um 10:00).")
+        return 1
+    token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
+    text = telegram_text(day, state, now, os.getenv("SITE_URL", ""))
+    if not token or not owner:
+        print(text)
+        return 0
+    tg_file = ROOT / "cache" / "telegram.json"
+    tg = TG.find_group(token, owner, tg_file)
+    if tg.get("chat_id"):
+        TG.send(token, tg["chat_id"], text, tg)
+        TG.save(tg_file, tg)
+        print(f"Telegram gesendet an Gruppe «{tg.get('title', '')}».")
+    else:
+        TG.send(token, owner, text)
+        print("Telegram gesendet (privat).")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="GoalOracle")
     ap.add_argument("--notify", action="store_true", help="Top-Tipps an Telegram senden")
@@ -122,9 +147,12 @@ def main():
     ap.add_argument("--retune", action="store_true", help="Modell-Einstellungen neu optimieren (dauert einige Minuten)")
     ap.add_argument("--dry-run", action="store_true", help="Telegram-Text nur anzeigen")
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
+    ap.add_argument("--send-only", action="store_true", help="Nur die heutigen Top 5 an Telegram senden, nichts rechnen")
     args = ap.parse_args()
 
     now = datetime.now(timezone.utc)
+    if args.send_only:
+        return send_only(now)
     season = now.year if now.month >= 7 else now.year - 1
     slugs = list(C.DISPLAY) + C.TRAIN_CLUB_LEAGUES + C.TRAIN_NATION
     events = espn.load(slugs, C.HISTORY_START, now)
@@ -220,6 +248,7 @@ def main():
     # Wappen lokal und klein ablegen (schneller auf dem Handy)
     crest_ids = shown | opp | {x["home"].get("id") for x in history} | {x["away"].get("id") for x in history}
     data["crests"] = sorted(crests.sync({t: info[t] for t in crest_ids if t in info}, WEB / "crests"))
+    data["telegram"] = TG.load(ROOT / "cache" / "telegram.json").get("title") or None
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
     write_json(WEB / "botd.json", botd_state)

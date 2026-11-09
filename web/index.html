@@ -384,6 +384,10 @@ form.sim { display: grid; gap: 14px; }
 .btn { appearance: none; border: 0; border-radius: var(--radius); background: var(--home); color: var(--surface); font: 700 17px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: 13px 16px; cursor: pointer; }
 @media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
 .btn:disabled { opacity: .55; cursor: progress; }
+.send-box { display: grid; gap: 8px; }
+.send-box .btn.confirm { background: var(--bad); border-color: var(--bad); }
+.send-box .note { margin: 0; text-align: center; }
+#view-top5 .send-box { margin-top: 12px; }
 .tl-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px; color: inherit; text-decoration: none; }
 .tl-link > svg:first-child { width: 22px; height: 22px; flex: none; color: var(--muted); }
 .tl-link span { flex: 1; min-width: 0; }
@@ -562,6 +566,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   <section class="view" id="view-top5" hidden>
     <div id="t5-today"></div>
+    <div class="send-box" data-send-box></div>
     <h2 class="sec" style="margin-top:28px">Bilanz der Bets des Tages</h2>
     <div class="chips" id="t5-kind" role="group" aria-label="Art">
       <button type="button" class="chip" data-v="all" aria-pressed="true">Alle</button>
@@ -643,6 +648,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       <span><b>Testlauf</b><small>Rückblick simulieren mit Budget und Risiko, oder das Spielgeld-Konto ansehen</small></span>
       <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </a>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-h"><h3>Telegram</h3><span class="muted" style="font-size:12.5px" id="tg-where"></span></div>
+      <div class="panel-b send-box" data-send-box></div>
+    </div>
     <div class="panel" id="model-panel" style="margin-bottom:16px">
       <div class="panel-h"><h3>Modell</h3><span class="muted" style="font-size:12.5px" id="mdl-stamp"></span></div>
       <div class="model-grid">
@@ -898,8 +907,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   let lastList = "spiele";
   // Jeder Bereich wird erst gebaut, wenn er sichtbar wird (spart Rechenzeit auf dem Handy)
   const dirty = new Set();
-  const RENDER = { spiele: () => renderMatches(), top5: () => renderTop5(), tipps: () => renderTipps(), ranking: () => renderRanking(),
-    bilanz: () => renderBilanz(), einstellungen: () => { renderSettings(); renderModel(); } };
+  const RENDER = { spiele: () => renderMatches(), top5: () => { renderTop5(); renderSend(); }, tipps: () => renderTipps(), ranking: () => renderRanking(),
+    bilanz: () => renderBilanz(), einstellungen: () => { renderSettings(); renderModel(); renderSend(); } };
   function markDirty(...views) { (views.length ? views : Object.keys(RENDER)).forEach((v) => dirty.add(v)); renderVisible(); }
   let currentView = null;
   function renderVisible() { if (currentView && dirty.has(currentView) && RENDER[currentView]) { dirty.delete(currentView); RENDER[currentView](); } }
@@ -1223,6 +1232,69 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   }
   $("#t5-kind").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; t5Kind = b.dataset.v; t5Shown = 14; renderTop5(); });
   $("#t5-more").addEventListener("click", () => { t5Shown += 14; renderTop5(); });
+
+  // ---------- Top 5 manuell an Telegram ----------
+  // Zwei Schritte (antippen, dann bestätigen), damit nichts aus Versehen rausgeht.
+  // Startet auf GitHub einen kurzen Lauf, der nur sendet und nichts neu rechnet.
+  const sendSt = { phase: "idle", msg: "", started: 0 };
+  let sendT = null, sendArm = null;
+  function todayIso() { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Zurich" }).format(new Date()); }
+  function renderSend() {
+    const has = !!ghToken(), today = data.botd_today && data.botd_today.day === todayIso();
+    const where = data.telegram ? `an die Gruppe «${data.telegram}»` : "an deinen Chat";
+    if ($("#tg-where")) $("#tg-where").textContent = data.telegram ? `Gruppe «${data.telegram}»` : "privater Chat";
+    let btn, note;
+    if (!has) { btn = `<button class="btn" type="button" data-send="key">Top 5 an Telegram senden</button>`; note = "Dafür einmalig unten bei «Modell» den GitHub-Schlüssel speichern."; }
+    else if (!today) { btn = `<button class="btn" type="button" disabled>Top 5 an Telegram senden</button>`; note = "Die Top 5 von heute werden um 10:00 festgelegt. Danach kannst du sie hier nochmals senden."; }
+    else if (sendSt.phase === "arm") { btn = `<button class="btn confirm" type="button" data-send="go">Ja, jetzt ${esc(where)} senden</button>`; note = "Nochmals antippen zum Bestätigen."; }
+    else if (sendSt.phase === "busy") { btn = `<button class="btn" type="button" disabled>Wird gesendet …</button>`; note = sendSt.msg; }
+    else { btn = `<button class="btn" type="button" data-send="arm">Top 5 an Telegram senden</button>`; note = sendSt.msg || `Schickt die heutigen 5 Tipps nochmals ${esc(where)}. Nichts wird neu gerechnet.`; }
+    $$("[data-send-box]").forEach((el) => (el.innerHTML = btn + `<p class="note">${note}</p>`));
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-send]");
+    if (!b) return;
+    if (b.dataset.send === "key") {
+      if (location.hash !== "#einstellungen") location.hash = "einstellungen";
+      setTimeout(() => { const t = $("#gh-token"); if (t) { t.scrollIntoView({ block: "center", behavior: "smooth" }); t.focus({ preventScroll: true }); } }, 150);
+      return;
+    }
+    if (b.dataset.send === "arm") {
+      sendSt.phase = "arm"; sendSt.msg = ""; renderSend();
+      clearTimeout(sendArm); sendArm = setTimeout(() => { if (sendSt.phase === "arm") { sendSt.phase = "idle"; renderSend(); } }, 6000);
+      return;
+    }
+    clearTimeout(sendArm);
+    sendSt.phase = "busy"; sendSt.msg = "Wird gestartet …"; sendSt.started = Date.now(); renderSend();
+    try {
+      const r = await ghFetch("/actions/workflows/daily.yml/dispatches", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: "main", inputs: { notify: "false", refresh_odds: "false", retune: "false", send_only: "true" } }) });
+      if (r.status === 401 || r.status === 403) throw new Error("Der GitHub-Schlüssel wurde abgelehnt.");
+      if (!r.ok) throw new Error("GitHub antwortet mit Fehler " + r.status + ".");
+      pollSend();
+    } catch (err) { sendSt.phase = "idle"; sendSt.msg = `<span class="neg-d">${esc(err.message || "Senden fehlgeschlagen.")}</span>`; renderSend(); }
+  });
+  function pollSend() {
+    clearTimeout(sendT);
+    const tick = async () => {
+      const secs = Math.round((Date.now() - sendSt.started) / 1000);
+      try {
+        const j = await (await ghFetch("/actions/workflows/daily.yml/runs?per_page=3")).json();
+        const run = (j.workflow_runs || []).find((x) => new Date(x.created_at).getTime() >= sendSt.started - 90e3);
+        if (run && run.status === "completed") {
+          sendSt.phase = "idle";
+          sendSt.msg = run.conclusion === "success" ? `<span class="pos-d">Gesendet.</span> Schau in Telegram.`
+            : `<span class="neg-d">Hat nicht geklappt.</span> <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Details auf GitHub</a>`;
+          renderSend(); return;
+        }
+        sendSt.msg = `${run && run.status !== "queued" ? "Sendet" : "Wartet auf GitHub"} · ${secs} s · meist unter einer Minute`;
+        renderSend();
+      } catch (err) { /* weiter versuchen */ }
+      if (secs > 600) { sendSt.phase = "idle"; sendSt.msg = "Dauert ungewöhnlich lange. Schau auf GitHub nach."; renderSend(); return; }
+      sendT = setTimeout(tick, 4000);
+    };
+    sendT = setTimeout(tick, 2500);
+  }
 
   // ---------- Spiel-Detail ----------
   function heatmap(u) {
