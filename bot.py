@@ -20,6 +20,7 @@ import requests
 import config as C
 import engine as E
 import botd as B
+from sources import telegram as TG
 import tuning as T
 from predictor import Params, Predictor
 from sources import crests, espn, fdcouk, oddsapi
@@ -99,14 +100,6 @@ def telegram_text(day: dict | None, state: dict, now, site):
         lines.append(f'Alle Spiele und Details: <a href="{site}#top5">{site}</a>')
     lines.append("<i>Statistisches Modell, keine Garantie. Wette nur, was du verlieren kannst.</i>")
     return "\n\n".join(lines)
-
-
-def send_telegram(text, token, chat_id):
-    r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=30,
-                      json={"chat_id": chat_id, "text": text[:4000], "parse_mode": "HTML",
-                            "disable_web_page_preview": True})
-    if not r.ok:
-        raise RuntimeError(f"Telegram-Fehler {r.status_code}: {r.text}")
 
 
 def wait_until(hhmm: str, max_minutes: int = 45):
@@ -238,20 +231,30 @@ def main():
     print(f"Web-Daten: {len(upcoming)} Spiele, {len(history)} in der Bilanz, "
           f"Spielgeld {paper['balance']:.2f} CHF")
 
+    token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
+    tg_file = ROOT / "cache" / "telegram.json"
+    tg = TG.find_group(token, owner, tg_file) if token and owner and not args.dry_run else {}
     if not args.notify and not args.dry_run:
         return
     site = os.getenv("SITE_URL", "")
     today = B.local_day(now)
     day = next((d for d in botd_state["days"] if not d.get("retro") and d["day"] == today), None)
     text = telegram_text(day, botd_state, now, site)
-    token, chat = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
-    if args.dry_run or not token or not chat:
+    if args.dry_run or not token or not owner:
         print(text)
         return
     if args.send_at:
         wait_until(args.send_at)
-    send_telegram(text, token, chat)
-    print("Telegram gesendet.")
+    if tg.get("chat_id"):
+        try:
+            TG.send(token, tg["chat_id"], text, tg)
+            TG.save(tg_file, tg)
+            print(f"Telegram gesendet an Gruppe «{tg.get('title', '')}».")
+            return
+        except RuntimeError as err:
+            print(f"Gruppe nicht erreichbar ({err}), sende privat.")
+    TG.send(token, owner, text)
+    print("Telegram gesendet (privat).")
 
 
 if __name__ == "__main__":

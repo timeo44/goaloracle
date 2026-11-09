@@ -4,7 +4,7 @@ Predict the game. Beat the gut feeling.
 
 Statistische Tipps für **Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League, Europa League, Conference League, Nations League** und die Pokale **FA Cup, League Cup, DFB-Pokal, Coppa Italia, Copa del Rey, Coupe de France**.
 
-Jeden Morgen um **10:00** kommt die Telegram-Nachricht. Dafür:
+Jeden Morgen um **10:00** kommt die Telegram-Nachricht. Wird der Bot zu einer Gruppe hinzugefügt (von dir), findet er sie beim nächsten Lauf selbst und schickt ab dann dorthin (`cache/telegram.json`). Dafür:
 1. lädt der Bot alle Resultate und Spielpläne aus über 60 Wettbewerben (ESPN), Schüsse aufs Tor, Ecken, Karten und historische Quoten (football-data.co.uk) und aktuelle Marktquoten (The Odds API),
 2. trainiert ein gemeinsames Dixon-Coles-Modell über alle Clubs, mit eigenem Heimvorteil je Wettbewerb und dem Niveau der eigenen Liga als Vorwissen, dazu ein Schuss-Modell, ein Modell für Nationalteams und Modelle für Ecken und Karten,
 3. mischt Modell und Marktquoten (Anteil wird per Rückblick optimiert) und berechnet daraus alle Märkte und Kombis exakt aus der Resultat-Matrix,
