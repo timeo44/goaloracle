@@ -1,1 +1,1 @@
-{"start":1000.0,"balance":1000.0,"since":"2026-11-08T22:00:15.798309+00:00","config":{"start_budget":1000.0,"risk":"ausgewogen","stake_mode":"percent","stake":2.0,"max_bets_per_day":6,"markets":["1X2","OU"]},"bets":[],"curve":[["2026-11-08",1000.0],["2026-11-09",1000.0]]}
+{"start":1000.0,"balance":1000.0,"since":"2026-11-08T22:00:15.798309+00:00","config":{"start_budget":1000.0,"risk":"ausgewogen","stake_mode":"percent","stake":2.0,"max_bets_per_day":6,"markets":["1X2","OU"]},"bets":[],"curve":[["2026-11-08",1000.0],["2026-11-09",1000.0],["2026-11-10",1000.0]]}
