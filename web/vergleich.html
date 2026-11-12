@@ -154,12 +154,18 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .btn.warn { background: var(--bad); }
 .btn:disabled { opacity: .5; cursor: default; }
 .ctl .msg { font-size: 13px; color: var(--muted); }
-.backlink { display: inline-block; margin: 0 0 14px; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin: 0 0 14px; }
+.reload { appearance: none; width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); cursor: pointer; }
+.reload svg { width: 18px; height: 18px; }
+.reload.spin svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.backlink { display: inline-block; margin: 0; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; }
 footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
-<main><a class="backlink" href="./#challenge">← GoalOracle</a><div id="app"><div class="empty">Lädt …</div></div></main>
+<main><div class="topbar"><a class="backlink" href="./#challenge">← GoalOracle</a>
+  <button class="reload" id="reload" type="button" aria-label="Aktualisieren" title="Aktualisieren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button></div><div id="app"><div class="empty">Lädt …</div></div></main>
 <script>
 (() => {
   // ------------------------------------------------------------------
@@ -371,6 +377,16 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     A = a; B = b; render();
   }
   boot();
+  // Aktualisieren: Seite und alle Daten frisch vom Server holen (auch in der Homescreen-App)
+  $("#reload").addEventListener("click", async () => {
+    const btn = $("#reload"); btn.classList.add("spin"); btn.disabled = true;
+    try {
+      await Promise.all([location.pathname, "duel.json", "duel-config.json"].map((u) => fetch(u, { cache: "reload" }).catch(() => null)));
+      if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); }
+    } catch (e) { /* trotzdem neu laden */ }
+    location.replace(location.pathname + "?r=" + Date.now() + location.hash);
+  });
+  if (qs.has("r")) { qs.delete("r"); history.replaceState(null, "", location.pathname + (qs.toString() ? "?" + qs : "") + location.hash); }
 })();
 </script>
 </body>
