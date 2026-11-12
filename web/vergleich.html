@@ -207,6 +207,58 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .tag.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
 .lv .foot { margin-top: 6px; font-size: 12px; color: var(--muted); }
 .tips li.open-bet { display: block; }
+/* Spiele anklickbar + Spielbericht */
+.mrow[data-leg], .legl[data-leg] { cursor: pointer; }
+@media (hover: hover) { .mrow[data-leg]:hover .mline { opacity: .8; } .legl[data-leg]:hover { text-decoration: underline; } }
+.mrow .more { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+.legl { display: block; }
+:root { --card-y: #E9B320; --card-r: #D23A2E; }
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+@media (min-width: 700px) { .sheet-bg { align-items: center; padding: 24px; } }
+.sheet { background: var(--bg); width: 100%; max-width: 760px; max-height: 92dvh; overflow-y: auto; border-radius: 14px 14px 0 0; padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; }
+@media (min-width: 700px) { .sheet { border-radius: 14px; } }
+.sheet .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sheet .bar span { font-size: 12.5px; color: var(--muted); }
+.sheet .x { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 36px; height: 36px; border-radius: var(--radius); font-size: 18px; cursor: pointer; }
+.hero { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 14px 4px 16px; text-align: center; }
+.hero .t { display: grid; justify-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; }
+.hero .t .logo { width: 52px; height: 52px; }
+.hero .t .logo.ph { font-size: 16px; }
+.hero .sc b { font-size: 44px; }
+.timeline { width: 100%; height: auto; display: block; }
+.timeline .mid { stroke: var(--muted); stroke-width: 1.5; }
+.timeline .tk { fill: var(--muted); font: 600 10px var(--font-body); }
+.timeline .ht { stroke: var(--muted); stroke-dasharray: 3 3; }
+.timeline .side { fill: var(--muted); font: 700 11px var(--font-display); letter-spacing: .05em; }
+.timeline g[data-tip] { cursor: pointer; }
+.timeline .hit { fill: transparent; }
+.timeline g.sel .hit { fill: color-mix(in srgb, var(--a) 22%, transparent); }
+.ic-ball { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.ic-ball-c { fill: var(--ink); }
+.ic-y { fill: var(--card-y); } .ic-r { fill: var(--card-r); }
+.ic-in { stroke: var(--good); } .ic-out { stroke: var(--bad); }
+.ic-corner { stroke: var(--muted); fill: var(--muted); }
+.ic-var { fill: none; stroke: var(--bad); stroke-width: 1.5; }
+.tl-info { min-height: 20px; font-size: 13px; color: var(--muted); padding: 4px 2px 0; }
+.tl-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.tl-tools .chip { display: inline-flex; align-items: center; gap: 6px; }
+.ev-list { list-style: none; margin: 0; padding: 0; }
+.ev-list li { display: grid; grid-template-columns: 44px 22px 1fr; gap: 8px; align-items: start; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.ev-list li.away { background: color-mix(in srgb, var(--sunken) 55%, transparent); }
+.ev-list .min { font: 700 15px/1.2 var(--font-display); color: var(--muted); }
+.ev-list svg { width: 18px; height: 18px; margin-top: 1px; }
+.ev-list small { color: var(--muted); display: block; }
+.statrow { display: grid; gap: 4px; padding: 9px 14px; border-top: 1px solid var(--line); }
+.statrow .nums { display: flex; justify-content: space-between; font-size: 13.5px; }
+.statrow .nums b { font: 700 17px/1 var(--font-display); }
+.statrow .nums span { color: var(--muted); }
+.statbar { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; height: 6px; }
+.statbar i { display: block; height: 100%; background: var(--sunken); border-radius: 2px; position: relative; overflow: hidden; }
+.statbar i b { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.statbar i:first-child b { right: 0; background: var(--a); } .statbar i:last-child b { left: 0; background: var(--b); }
+.ph-h { padding: 12px 14px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ph-h h3 { font-size: 17px; }
+.ph-b { padding: 4px 14px 12px; }
 .backlink { display: inline-block; margin: 0; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; }
 footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
 </style>
@@ -290,12 +342,14 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return { bank, peak, attempts, streak, best, open, pts, start, goal, n: bets.length, has: !!c };
   }
   const pos = (r, v) => Math.max(0, Math.min(100, Math.log(Math.max(v, r.start) / r.start) / Math.log(r.goal / r.start) * 100));
-  // Animierte Strecke für eine laufende Wette: von jetzt bis zum Betrag bei Gewinn
+  // Läuft gerade eines der Spiele der Wette?
+  const betLive = (b) => b.legs.some((l) => l.status === "open" && LIVE[legKey(l)] && LIVE[legKey(l)].state === "in");
+  // Animierte Strecke, solange ein Spiel der Wette live läuft: von jetzt bis zum Betrag bei Gewinn
   const gainBar = (from, to) => to > from ? `<span class="gain" style="left:${from}%;width:${(to - from).toFixed(2)}%"></span><span class="goal-tick" style="left:${to}%" title="bei Gewinn"></span>` : "";
   function lane(bot, r, cls) {
     const o = r.open;
     return `<div class="lane ${cls}"><div class="nm">${esc(bot.bot.name)}<small>Versuch ${r.attempts}</small></div><div class="amt">${num(r.bank)}<small>CHF</small></div>
-      <div class="road"><span class="fill" style="width:${pos(r, r.bank)}%"></span>${o ? gainBar(pos(r, r.bank), pos(r, r.bank * o.odds)) : ""}${r.peak > r.bank ? `<span class="pk" style="left:${pos(r, r.peak)}%" title="Höchststand"></span>` : ""}<span class="car" style="left:${pos(r, r.bank)}%"></span></div>
+      <div class="road"><span class="fill" style="width:${pos(r, r.bank)}%"></span>${o && betLive(o) ? gainBar(pos(r, r.bank), pos(r, r.bank * o.odds)) : ""}${r.peak > r.bank ? `<span class="pk" style="left:${pos(r, r.peak)}%" title="Höchststand"></span>` : ""}<span class="car" style="left:${pos(r, r.bank)}%"></span></div>
       <div class="meta"><span>${r.streak} ${r.streak === 1 ? "Sieg" : "Siege"} in Folge · Hoch ${num(r.peak, 0)}</span><span>${o ? `läuft: ${o.legs.length > 1 ? o.legs.length + "er-Kombi" : esc(o.legs[0].label)} · ${num(o.odds)}` : r.has ? "keine Wette offen" : "keine Challenge-Daten"}</span></div></div>`;
   }
   function raceChart(ra, rb) {
@@ -363,7 +417,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return `<div class="panel ch ${cls}">
       <div class="top"><h3>${esc(bot.bot.name)}</h3><span class="muted" style="font-size:12.5px">Versuch ${s.cur.n} · ${s.curWins} ${s.curWins === 1 ? "Sieg" : "Siege"}</span></div>
       <div class="bank">${num(s.cur.bank)}<small>${esc(s.c.currency || "CHF")}</small></div>
-      <div class="track"><i style="width:${Math.max(1.5, pos(s.cur.bank))}%"></i>${o ? gainBar(pos(s.cur.bank), pos(s.cur.bank * o.odds)) : ""}${s.peak > s.cur.bank ? `<em style="left:${pos(s.peak)}%" title="Rekord"></em>` : ""}</div>
+      <div class="track"><i style="width:${Math.max(1.5, pos(s.cur.bank))}%"></i>${o && betLive(o) ? gainBar(pos(s.cur.bank), pos(s.cur.bank * o.odds)) : ""}${s.peak > s.cur.bank ? `<em style="left:${pos(s.peak)}%" title="Rekord"></em>` : ""}</div>
       <dl><div><dt>Rekord</dt><dd>${num(s.peak, 0)}</dd></div><div><dt>Versuche</dt><dd>${s.attempts}</dd></div><div><dt>Treffer</dt><dd>${pct(s.rate)}</dd></div></dl>
       ${o ? `<div class="cur"><b>${o.legs.length > 1 ? o.legs.length + "er-Kombi" : esc(o.legs[0].label)}</b> · Quote ${num(o.odds)}
         <small>${o.legs.map((l) => `${esc(l.home)} – ${esc(l.away)}${o.legs.length > 1 ? " (" + esc(l.label) + ")" : ""}`).join(" + ")}</small>
@@ -402,7 +456,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     const comp = ev.competitions && ev.competitions[0]; if (!comp) return null;
     const side = (h) => comp.competitors.find((c) => c.homeAway === h) || {};
     const H = side("home"), Aw = side("away"), st = (ev.status || comp.status || {}).type || {};
-    return { state: st.state, detail: st.shortDetail || st.detail || "", completed: !!st.completed,
+    return { id: String(ev.id), state: st.state, detail: st.shortDetail || st.detail || "", completed: !!st.completed,
       hs: H.score != null && H.score !== "" ? +H.score : null, as: Aw.score != null && Aw.score !== "" ? +Aw.score : null,
       hl: H.team && (H.team.logo || (H.team.logos && H.team.logos[0] && H.team.logos[0].href)), al: Aw.team && (Aw.team.logo || (Aw.team.logos && Aw.team.logos[0] && Aw.team.logos[0].href)),
       hn: [H.team && H.team.displayName, H.team && H.team.shortDisplayName, H.team && H.team.name], an: [Aw.team && Aw.team.displayName, Aw.team && Aw.team.shortDisplayName, Aw.team && Aw.team.name] };
@@ -411,13 +465,13 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     const date = etDate(l.kickoff);
     if (l.espn && l.espn.league && l.espn.event) {
       const ev = (await scoreboard(l.espn.league, date)).find((e) => String(e.id) === String(l.espn.event));
-      if (ev) return readEvent(ev);
+      if (ev) return { ...readEvent(ev), slug: l.espn.league };
     }
     const first = SLUG[String(l.competition || "").toLowerCase()];
     for (const slug of first ? [first, ...FALLBACK.filter((x) => x !== first)] : FALLBACK) {
       for (const ev of await scoreboard(slug, date)) {
         const r = readEvent(ev);
-        if (r && sameTeam(l.home, r.hn.filter(Boolean)) && sameTeam(l.away, r.an.filter(Boolean))) return r;
+        if (r && sameTeam(l.home, r.hn.filter(Boolean)) && sameTeam(l.away, r.an.filter(Boolean))) return { ...r, slug };
       }
     }
     return null;
@@ -447,9 +501,10 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     const tag = l.status === "won" ? `<span class="tag good">✓ gewonnen</span>` : l.status === "lost" ? `<span class="tag bad">✗ verloren</span>`
       : l.status === "void" ? `<span class="tag">abgesagt</span>` : state === "in" ? (now === true ? `<span class="tag good">liegt richtig</span>` : now === false ? `<span class="tag bad">liegt falsch</span>` : `<span class="tag">live</span>`)
       : state === "post" ? (now === true ? `<span class="tag good">✓ geschafft</span>` : now === false ? `<span class="tag bad">✗ daneben</span>` : `<span class="tag">Ende</span>`) : `<span class="tag">offen</span>`;
-    return `<div class="mrow"><div class="mline"><span class="team">${logoImg(l.home_logo || (L && L.hl), l.home)}<span>${esc(l.home)}</span></span>
+    return `<div class="mrow" data-leg="${reg(l)}" role="button" tabindex="0" aria-label="Spieldetails ${esc(l.home)} gegen ${esc(l.away)}"><div class="mline"><span class="team">${logoImg(l.home_logo || (L && L.hl), l.home)}<span>${esc(l.home)}</span></span>
       <span class="sc">${mid}</span><span class="team away">${logoImg(l.away_logo || (L && L.al), l.away)}<span>${esc(l.away)}</span></span></div>
-      <div class="pickline"><span class="pk">${esc(l.label)}<small>${num(l.odds)}${l.competition ? " · " + esc(l.competition) : ""}</small></span>${tag}</div></div>`;
+      <div class="pickline"><span class="pk">${esc(l.label)}<small>${num(l.odds)}${l.competition ? " · " + esc(l.competition) : ""}</small></span>${tag}</div>
+      ${state !== "pre" ? `<div class="more">Antippen: Tore, Karten, Wechsel ›</div>` : ""}</div>`;
   }
   function openBet(bot) {
     const c = bot && bot.challenge;
@@ -471,6 +526,8 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   function renderLive() {
     const el = $("#live"); if (!el || !A) return;
     el.innerHTML = `<div class="livegrid">${liveCard(A, A.bot.name, "")}${liveCard(B, B ? B.bot.name : "Gegner", "bside")}</div>`;
+    const ch = $("#chall");
+    if (ch) ch.innerHTML = `<div class="two">${chCard(A, chStats(A), "")}${B ? chCard(B, chStats(B), "bside") : `<div class="panel ch bside"><div class="top"><h3>Gegner</h3></div><div class="empty">Noch keine Daten.</div></div>`}</div>`;
     const la = $("#list-a"), lb = $("#list-b");
     if (la) la.innerHTML = betList(A);
     if (lb && B) lb.innerHTML = betList(B);
@@ -486,6 +543,205 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     liveTimer = setTimeout(refreshLive, anyLive ? 30e3 : 300e3);
   }
 
+  // ---------- Spielbericht beim Antippen (gleiche Darstellung wie in der App) ----------
+  const REG = [];
+  const reg = (l) => { let i = REG.indexOf(l); if (i < 0) { REG.push(l); i = REG.length - 1; } return i; };
+  const ICON = {
+    goal: '<circle class="ic-ball" r="7"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z"/>',
+    own: '<circle class="ic-ball" r="7" style="stroke:var(--bad)"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z" style="fill:var(--bad)"/>',
+    pen: '<circle class="ic-ball" r="7"/><path class="ic-ball-c" d="M0-3.2 3 -1 1.9 2.6H-1.9L-3-1Z"/><text x="7" y="-4" style="font:700 8px var(--font-display);fill:var(--ink)">P</text>',
+    yellow: '<rect class="ic-y" x="-4" y="-6" width="8" height="12" rx="1.5"/>',
+    red: '<rect class="ic-r" x="-4" y="-6" width="8" height="12" rx="1.5"/>',
+    yr: '<rect class="ic-y" x="-6" y="-7" width="8" height="12" rx="1.5"/><rect class="ic-r" x="-2" y="-5" width="8" height="12" rx="1.5"/>',
+    sub: '<path class="ic-in" d="M-3 5V-5M-6-2l3-3 3 3" fill="none" stroke-width="1.8"/><path class="ic-out" d="M3-5V5M0 2l3 3 3-3" fill="none" stroke-width="1.8"/>',
+    var: '<rect class="ic-var" x="-8" y="-6" width="16" height="12" rx="2"/><text x="0" y="3" text-anchor="middle" style="font:700 7px var(--font-display);fill:var(--bad)">VAR</text>',
+    miss: '<circle class="ic-ball" r="7" style="stroke-dasharray:2 2"/><path d="M-5-5 5 5" style="stroke:var(--bad);stroke-width:1.8"/>',
+    corner: '<path class="ic-corner" d="M-3 6V-6" stroke-width="1.5"/><path class="ic-corner" d="M-3-6 5-3.5-3-1Z" stroke="none"/>',
+  };
+  const EVNAME = { goal: "Tor", own: "Eigentor", pen: "Penaltytor", miss: "Penalty verschossen", yellow: "Gelbe Karte", red: "Rote Karte", yr: "Gelb-Rot", sub: "Wechsel", var: "VAR: Tor aberkannt", corner: "Eckball" };
+  const iconSvg = (t, size = 18) => `<svg viewBox="-9 -9 18 18" width="${size}" height="${size}" aria-hidden="true">${ICON[t]}</svg>`;
+  let tlShow = { sub: true, corner: false };
+  try { Object.assign(tlShow, JSON.parse(localStorage.getItem("go-duel-tl") || "{}")); } catch (e) { /* egal */ }
+  function minuteOf(clock) {
+    const d = (clock && clock.displayValue) || "";
+    const m = d.match(/(\d+)'(?:\+(\d+))?/);
+    if (m) return { base: +m[1], extra: m[2] ? +m[2] : 0, label: d.replace(/'/g, "’") };
+    const v = clock && clock.value ? Math.ceil(clock.value / 60) : 0;
+    return { base: v, extra: 0, label: v + "’" };
+  }
+  function parseSummary(j) {
+    const comp = j.header && j.header.competitions && j.header.competitions[0];
+    if (!comp) return null;
+    const cs = comp.competitors || [];
+    const home = cs.find((c) => c.homeAway === "home") || cs[0], away = cs.find((c) => c.homeAway === "away") || cs[1];
+    const side = (teamId, name) => {
+      if (teamId && String(teamId) === String(home.team.id)) return "home";
+      if (teamId && String(teamId) === String(away.team.id)) return "away";
+      if (name) { const n = name.toLowerCase(); if ((home.team.displayName || "").toLowerCase() === n) return "home"; if ((away.team.displayName || "").toLowerCase() === n) return "away"; }
+      return null;
+    };
+    const st = (comp.status && comp.status.type) || {};
+    const evs = [], seen = new Set();
+    const add = (e) => { const key = e.type + e.min.label + (e.who || "") + e.side; if (seen.has(key)) return; seen.add(key); evs.push(e); };
+    for (const k of j.keyEvents || []) {
+      const tt = ((k.type && k.type.text) || "").toLowerCase(), txt = k.text || "";
+      const ps = (k.participants || []).map((p) => p.athlete && p.athlete.displayName).filter(Boolean);
+      const sd = side(k.team && k.team.id, k.team && k.team.displayName), min = minuteOf(k.clock);
+      if (!sd) continue;
+      let type = null, who = ps[0] || "", extra = "";
+      if (tt.includes("var") || /\bVAR\b/.test(txt) && /(disallow|no goal|overturn|cancel)/i.test(txt)) { type = "var"; extra = txt.replace(/^VAR Decision:\s*/i, ""); }
+      else if (k.scoringPlay || tt.includes("goal") || tt === "penalty - scored") {
+        type = /own goal/i.test(tt + txt) ? "own" : /penalty/i.test(tt) ? "pen" : "goal";
+        if (ps[1]) extra = "Vorlage: " + ps[1];
+      } else if (tt.includes("penalty") && (tt.includes("miss") || tt.includes("saved"))) type = "miss";
+      else if (tt.includes("yellow") && tt.includes("red") || tt.includes("second yellow")) type = "yr";
+      else if (tt.includes("red card")) type = "red";
+      else if (tt.includes("yellow card")) type = "yellow";
+      else if (tt.includes("substitution")) { type = "sub"; extra = ps[1] ? "für " + ps[1] : ""; }
+      if (type) add({ type, side: sd, min, who, extra });
+    }
+    for (const c of j.commentary || []) {
+      const pl = c.play || {}, tt = ((pl.type && pl.type.text) || "").toLowerCase(), txt = c.text || "";
+      const min = minuteOf(pl.clock || c.time);
+      if (tt === "corner awarded") {
+        const sd = side(pl.team && pl.team.id, (pl.team && pl.team.displayName) || (txt.match(/^Corner,\s*([^.]+)\./) || [])[1]);
+        if (sd) evs.push({ type: "corner", side: sd, min, who: "", extra: "" });
+      } else if (/\bVAR\b/.test(txt) && /(disallow|no goal|overturn|ruled out)/i.test(txt)) {
+        const nm = (txt.match(/\(([^)]+)\)/) || [])[1];
+        const sd = side(pl.team && pl.team.id, (pl.team && pl.team.displayName) || nm);
+        if (sd) add({ type: "var", side: sd, min, who: "", extra: txt });
+      }
+    }
+    evs.sort((a, b) => a.min.base - b.min.base || a.min.extra - b.min.extra);
+    const stats = {};
+    for (const t of (j.boxscore && j.boxscore.teams) || []) {
+      const sd = side(t.team && t.team.id);
+      if (!sd) continue;
+      for (const x of t.statistics || []) { (stats[x.name] = stats[x.name] || {})[sd] = x.displayValue; }
+    }
+    const logo = (t) => t.logo || (t.logos && t.logos[0] && t.logos[0].href) || "";
+    const tla = (t) => t.abbreviation || (t.shortDisplayName || t.displayName || "").slice(0, 3).toUpperCase();
+    return {
+      home: { name: home.team.shortDisplayName || home.team.displayName, logo: logo(home.team), tla: tla(home.team), score: +home.score || 0 },
+      away: { name: away.team.shortDisplayName || away.team.displayName, logo: logo(away.team), tla: tla(away.team), score: +away.score || 0 },
+      date: comp.date || null, state: st.state, completed: !!st.completed, detail: st.shortDetail || st.detail || "",
+      events: evs, stats, maxMin: Math.max(90, ...evs.map((e) => e.min.base)) > 90 ? 120 : 90,
+    };
+  }
+  function timelineSvg(S) {
+    const avail = Math.max(300, Math.min(720, ($(".sheet") ? $(".sheet").clientWidth : 640) - 34));
+    const W = Math.round(avail), H = 172, L = 40, R = 10, mid = 86, maxM = S.maxMin;
+    const X = (m) => L + Math.min(m.base + Math.min(m.extra, 6) * 0.35, maxM + 2) / (maxM + 2) * (W - L - R);
+    const ticks = (W < 420 ? [0, 30, 45, 60, 90] : [0, 15, 30, 45, 60, 75, 90]).concat(maxM > 90 ? [105, 120] : [])
+      .map((m) => `<text class="tk" x="${X({ base: m, extra: 0 })}" y="${mid + 4}" text-anchor="middle">${m}</text>`).join("");
+    const lanes = { home: [], away: [] };
+    const icons = S.events.filter((e) => tlShow[e.type] !== false).map((e) => {
+      const x = X(e.min), L2 = lanes[e.side];
+      let ln = 0; while (L2.some((p) => p.lane === ln && Math.abs(p.x - x) < 15)) ln++;
+      L2.push({ x, lane: ln });
+      const dist = (e.type === "corner" ? 22 : 30) + ln * 19;
+      const y = e.side === "home" ? mid - dist : mid + dist;
+      const team = e.side === "home" ? S.home.name : S.away.name;
+      const tip = `${e.min.label} ${EVNAME[e.type]} · ${e.who || team}${e.extra ? " (" + e.extra + ")" : ""}`;
+      return `<g transform="translate(${x.toFixed(1)},${y})" data-tip="${esc(tip)}" tabindex="0" role="img" aria-label="${esc(tip)}"><rect class="hit" x="-10" y="-10" width="20" height="20" rx="4"/>${ICON[e.type]}</g>`;
+    }).join("");
+    return `<svg class="timeline" viewBox="0 0 ${W} ${H}" role="img" aria-label="Spielverlauf">
+      <line class="mid" x1="${L}" x2="${W - R}" y1="${mid - 10}" y2="${mid - 10}"/><line class="mid" x1="${L}" x2="${W - R}" y1="${mid + 10}" y2="${mid + 10}"/>
+      <line class="ht" x1="${X({ base: 45, extra: 0 })}" x2="${X({ base: 45, extra: 0 })}" y1="8" y2="${H - 8}"/>
+      ${maxM > 90 ? `<line class="ht" x1="${X({ base: 90, extra: 0 })}" x2="${X({ base: 90, extra: 0 })}" y1="8" y2="${H - 8}"/>` : ""}
+      ${ticks}<text class="side" x="2" y="${mid - 26}">${esc(S.home.tla)}</text><text class="side" x="2" y="${mid + 34}">${esc(S.away.tla)}</text>${icons}</svg>`;
+  }
+  function eventListHtml(S) {
+    const list = S.events.filter((e) => e.type !== "corner" && tlShow[e.type] !== false);
+    if (!list.length) return `<div class="ph-b muted">Noch keine Ereignisse.</div>`;
+    return `<ul class="ev-list">${list.map((e) => `<li class="${e.side}"><span class="min">${esc(e.min.label)}</span>${iconSvg(e.type)}
+      <span><b>${esc(e.who || EVNAME[e.type])}</b>${e.who ? ` · ${EVNAME[e.type]}` : ""} · ${esc(e.side === "home" ? S.home.name : S.away.name)}${e.extra ? `<small>${esc(e.extra)}</small>` : ""}</span></li>`).join("")}</ul>`;
+  }
+  const STAT_ROWS = [["possessionPct", "Ballbesitz", "%"], ["totalShots", "Schüsse"], ["shotsOnTarget", "Schüsse aufs Tor"], ["wonCorners", "Eckbälle"],
+    ["foulsCommitted", "Fouls"], ["yellowCards", "Gelbe Karten"], ["redCards", "Rote Karten"], ["offsides", "Abseits"], ["saves", "Paraden"]];
+  function statsHtml(S) {
+    const rows = STAT_ROWS.filter(([k]) => S.stats[k]).map(([k, name, unit]) => {
+      const h = parseFloat(S.stats[k].home) || 0, a = parseFloat(S.stats[k].away) || 0;
+      let hs = String(S.stats[k].home ?? "–"), as = String(S.stats[k].away ?? "–");
+      if (unit === "%") { hs = Math.round(h) + "%"; as = Math.round(a) + "%"; }
+      const max = Math.max(h, a, 0.0001);
+      return `<div class="statrow"><div class="nums"><b>${esc(hs)}</b><span>${esc(name)}</span><b>${esc(as)}</b></div>
+        <div class="statbar"><i><b style="width:${h / max * 100}%"></b></i><i><b style="width:${a / max * 100}%"></b></i></div></div>`;
+    }).join("");
+    return rows || `<div class="ph-b muted">Noch keine Statistik.</div>`;
+  }
+  let sheet = null;   // { l, S, err, timer }
+  function drawSheet() {
+    if (!sheet) return;
+    const { l, S, err, loading } = sheet;
+    const hs = S && S.state !== "pre" ? S.home.score : null, as = S && S.state !== "pre" ? S.away.score : null;
+    const mid = S && S.state === "in" ? `<b>${hs}:${as}</b><small class="live">${esc(S.detail || "Live")}</small>`
+      : S && S.state === "post" ? `<b>${hs}:${as}</b><small>${esc(S.detail || "Ende")}</small>`
+      : `<span class="ko">${esc(fKick.format(new Date(l.kickoff)).replace(",", ""))}</span><small>Anpfiff</small>`;
+    const now = S && S.state !== "pre" ? pickNow(l.pick, hs, as) : null;
+    const tag = now === true ? `<span class="tag good">${S.state === "in" ? "liegt richtig" : "✓ geschafft"}</span>` : now === false ? `<span class="tag bad">${S.state === "in" ? "liegt falsch" : "✗ daneben"}</span>` : `<span class="tag">offen</span>`;
+    const L = LIVE[legKey(l)];
+    let body;
+    if (!S) body = `<div class="panel empty">${loading ? "Spieldaten werden geladen …" : err ? "Zu diesem Spiel hat ESPN (noch) keine Daten." : ""}</div>`;
+    else if (S.state === "pre") body = `<div class="panel empty">Das Spiel hat noch nicht begonnen. Tore, Karten und Wechsel erscheinen hier ab dem Anpfiff.</div>`;
+    else body = `<div class="panel"><div class="ph-h"><h3>Spielverlauf</h3><span class="muted" style="font-size:12.5px">Symbole antippen</span></div>
+        <div class="ph-b"><div class="tl-tools"><button type="button" class="chip" data-tl="sub" aria-pressed="${tlShow.sub !== false}">${iconSvg("sub", 14)} Wechsel</button>
+          <button type="button" class="chip" data-tl="corner" aria-pressed="${tlShow.corner !== false}">${iconSvg("corner", 14)} Eckbälle</button></div>
+          ${timelineSvg(S)}<div class="tl-info" id="tl-info"></div></div>${eventListHtml(S)}</div>
+      <div class="panel" style="margin-top:12px"><div class="ph-h"><h3>Statistik</h3><span class="muted" style="font-size:12.5px">${esc(S.home.tla)} links · ${esc(S.away.tla)} rechts</span></div>${statsHtml(S)}</div>`;
+    const top = $(".sheet") ? $(".sheet").scrollTop : 0;
+    const el = $("#sheet") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "sheet" }));
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-modal="true" aria-label="Spieldetails">
+      <div class="bar"><span>${esc(l.competition || "")}</span><button class="x" type="button" data-close aria-label="Schliessen">✕</button></div>
+      <div class="hero"><div class="t">${logoImg((S && S.home.logo) || l.home_logo || (L && L.hl), l.home)}<span>${esc(l.home)}</span></div>
+        <div class="sc">${mid}</div><div class="t">${logoImg((S && S.away.logo) || l.away_logo || (L && L.al), l.away)}<span>${esc(l.away)}</span></div></div>
+      <div class="pickline" style="margin:0 2px 14px"><span class="pk">Tipp: ${esc(l.label)}<small>Quote ${num(l.odds)}</small></span>${tag}</div>
+      ${body}</div></div>`;
+    if ($(".sheet")) $(".sheet").scrollTop = top;
+  }
+  async function loadSheet() {
+    if (!sheet) return;
+    clearTimeout(sheet.timer);
+    const l = sheet.l;
+    let L = LIVE[legKey(l)];
+    if (!L || !L.slug) { L = await findLive(l); if (L) LIVE[legKey(l)] = L; }
+    if (!sheet || sheet.l !== l) return;
+    if (!L) { sheet.loading = false; sheet.err = true; drawSheet(); return; }
+    try {
+      const j = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${encodeURIComponent(L.slug)}/summary?event=${encodeURIComponent(L.id)}`, { cache: "no-store" }).then((r) => r.json());
+      if (!sheet || sheet.l !== l) return;
+      sheet.S = parseSummary(j); sheet.err = !sheet.S;
+    } catch (e) { if (sheet) sheet.err = true; }
+    if (!sheet || sheet.l !== l) return;
+    sheet.loading = false; drawSheet();
+    if (sheet.S && sheet.S.state === "in") sheet.timer = setTimeout(loadSheet, 30e3);
+  }
+  function openSheet(i) {
+    const l = REG[i]; if (!l) return;
+    sheet = { l, S: null, err: false, loading: true, timer: null };
+    document.documentElement.style.overflow = "hidden";
+    drawSheet(); loadSheet();
+  }
+  function closeSheet() {
+    if (sheet) clearTimeout(sheet.timer);
+    sheet = null; const el = $("#sheet"); if (el) el.innerHTML = "";
+    document.documentElement.style.overflow = "";
+  }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".sheet .x") || (e.target.classList && e.target.classList.contains("sheet-bg"))) { closeSheet(); return; }
+    const tl = e.target.closest("[data-tl]");
+    if (tl && sheet) { tlShow[tl.dataset.tl] = tl.getAttribute("aria-pressed") !== "true"; try { localStorage.setItem("go-duel-tl", JSON.stringify(tlShow)); } catch (er) { /* egal */ } drawSheet(); return; }
+    const g = e.target.closest(".timeline g[data-tip]");
+    if (g) { document.querySelectorAll(".timeline g.sel").forEach((x) => x.classList.remove("sel")); g.classList.add("sel"); const info = $("#tl-info"); if (info) info.textContent = g.dataset.tip; return; }
+    const row = e.target.closest("[data-leg]");
+    if (row && !e.target.closest(".sheet")) openSheet(+row.dataset.leg);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && sheet) closeSheet();
+    const row = e.target.closest && e.target.closest("[data-leg]");
+    if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSheet(+row.dataset.leg); }
+  });
+
   // Wetten einer Challenge (seit Duell-Start, sonst aktueller Versuch), neueste zuerst
   function betList(bot) {
     const c = bot && bot.challenge;
@@ -497,7 +753,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return list.map((b) => {
       if (b.status === "open") return `<li class="open-bet"><div style="display:flex;justify-content:space-between;gap:10px"><b>${b.legs.length > 1 ? b.legs.length + "er-Kombi" : "Einzelwette"} · ${num(b.odds)}</b><span class="r">${num(b.stake)} → ${num(b.stake * b.odds)}</span></div>${b.legs.map(matchRow).join("")}</li>`;
       const what = b.legs.length > 1 ? `${b.legs.length}er-Kombi` : esc(b.legs[0].label);
-      const sub = b.legs.map((l) => `${esc(l.home)} – ${esc(l.away)}${b.legs.length > 1 ? " (" + esc(l.label) + ")" : ""}${l.score ? " " + esc(l.score) : ""}`).join(" + ");
+      const sub = b.legs.map((l) => `<span class="legl" data-leg="${reg(l)}" role="button" tabindex="0">${esc(l.home)} – ${esc(l.away)}${b.legs.length > 1 ? " (" + esc(l.label) + ")" : ""}${l.score ? " " + esc(l.score) : ""} ›</span>`).join("");
       const res = b.status === "won" ? `<span class="st won">✓ ${num(b.payout)}</span>` : b.status === "lost" ? `<span class="st lost">✗ 0.00</span>` : b.status === "void" ? `<span class="st void">zurück</span>` : `<span class="st open">läuft</span>`;
       return `<li><span><b>${what}</b> · ${num(b.odds)}<small>${sub}</small><small>Versuch ${b.n} · ${esc(fDay.format(new Date(b.legs[0].kickoff)))}</small></span><span class="r">${num(b.stake)} →<br>${res}</span></li>`;
     }).join("");
@@ -509,18 +765,16 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     const side = (bot, name, cls, c) => `<div class="side"><div class="name ${cls}">${esc(name)}</div><div class="who">${bot ? esc(bot.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(bot.updated))) : ""}</div>${connHtml(c)}</div>`;
     const head = `<div class="vs">${side(A, nameA, "a", cA)}<div class="mid">VS</div>${side(B, nameB, "b", cB)}</div>`;
     if (!A) { app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>Eigene Daten fehlen</strong>duel.json konnte nicht geladen werden.</div>`; return; }
-    const ca = chStats(A), cb = B ? chStats(B) : null;
     app.innerHTML = head + `
       <h2 class="sec">Aktive Wetten</h2><div id="live"></div>
-      <h2 class="sec">Challenge 100 → 100'000</h2>${raceHtml()}${ctlHtml()}
+      <h2 class="sec">Challenge gesamt</h2><div id="chall"></div>
       <h2 class="sec">${CFG.started ? "Wetten seit dem Start" : "Aktueller Versuch"}</h2>
       <div class="chips mob-tabs" role="group"><button class="chip" data-s="a" aria-pressed="${mobSide === "a"}">${esc(nameA)}</button><button class="chip" data-s="b" aria-pressed="${mobSide === "b"}">${esc(nameB)}</button></div>
       <div class="lists one-${mobSide}" style="margin-top:10px">
         <div class="panel la"><div class="head">${esc(nameA)}</div><ul class="tips" id="list-a">${betList(A)}</ul></div>
         <div class="panel lb"><div class="head">${esc(nameB)}</div><ul class="tips" id="list-b">${B ? betList(B) : `<li class="muted">${SRC[1] ? "Daten nicht erreichbar." : "Kein Gegner eingetragen."}</li>`}</ul></div></div>
-      <h2 class="sec">Challenge gesamt</h2>
-      <div class="two">${chCard(A, ca, "")}${B ? chCard(B, cb, "bside") : `<div class="panel ch bside"><div class="top"><h3>${esc(nameB)}</h3></div><div class="empty">Noch keine Daten.</div></div>`}</div>
-      <p class="note">Challenge-Regeln: Start mit 100 CHF, immer nur eine Wette offen, der ganze Betrag wird weiter eingesetzt, jede Wette etwa Quote 2. Eine verlorene Wette heisst: zurück auf 100. «Challenge gesamt» zählt alle Versuche seit Beginn, das Duell oben nur ab dem Start-Klick.</p>
+      <p class="note">Challenge-Regeln: Start mit 100 CHF, immer nur eine Wette offen, der ganze Betrag wird weiter eingesetzt, jede Wette etwa Quote 2. Eine verlorene Wette heisst: zurück auf 100.${CFG.started ? ` «Wetten seit dem Start» zeigt alles ab ${esc(fStamp.format(new Date(CFG.started)))}.` : ""}</p>
+      ${ctlHtml()}
       <div class="panel connbox"><span><b class="a">${esc(nameA)}</b> ${connHtml(cA)}</span><span><b class="b">${esc(nameB)}</b> ${connHtml(cB)}</span></div>
       <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1</footer>`;
     renderLive();
