@@ -4,7 +4,7 @@ name: Webseite veröffentlichen
 on:
   push:
     branches: [main]
-    paths: ["web/index.html", "web/manifest.webmanifest", "web/*.png", "web/*.svg"]
+    paths: ["web/index.html", "web/vergleich.html", "web/manifest.webmanifest", "web/*.png", "web/*.svg"]
   workflow_dispatch:
 
 permissions:
