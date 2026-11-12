@@ -138,6 +138,18 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .lane .road { grid-column: 1 / -1; position: relative; height: 26px; margin-top: 6px; }
 .lane .road::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 4px; border-radius: 2px; background: var(--sunken); }
 .lane .road .fill { position: absolute; left: 0; top: 11px; height: 4px; border-radius: 2px; }
+/* Laufende Wette: der Strich wächst animiert bis dorthin, wo er bei einem Gewinn stünde */
+.gain { position: absolute; height: 4px; border-radius: 2px; transform-origin: left center; animation: gain 2.2s cubic-bezier(.4, 0, .2, 1) infinite; opacity: .55; }
+.lane .road .gain { top: 11px; }
+.track .gain { top: 0; bottom: 0; height: auto; }
+.lane.la .gain, .ch .track .gain { background: var(--a); }
+.lane.lb .gain, .ch.bside .track .gain { background: var(--b); }
+.goal-tick { position: absolute; width: 2px; border-radius: 1px; opacity: .55; }
+.lane .road .goal-tick { top: 7px; height: 12px; } .track .goal-tick { top: -3px; height: 12px; }
+.lane.la .goal-tick, .ch .track .goal-tick { background: var(--a); }
+.lane.lb .goal-tick, .ch.bside .track .goal-tick { background: var(--b); }
+@keyframes gain { 0% { transform: scaleX(0); opacity: .7; } 65% { transform: scaleX(1); opacity: .55; } 100% { transform: scaleX(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gain { animation: none; opacity: .3; } }
 .lane .road .car { position: absolute; top: 4px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); transition: left .6s; }
 .lane .road .pk { position: absolute; top: 6px; width: 2px; height: 14px; background: var(--muted); opacity: .6; }
 .lane.la .fill, .lane.la .car { background: var(--a); } .lane.lb .fill, .lane.lb .car { background: var(--b); }
@@ -278,10 +290,12 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return { bank, peak, attempts, streak, best, open, pts, start, goal, n: bets.length, has: !!c };
   }
   const pos = (r, v) => Math.max(0, Math.min(100, Math.log(Math.max(v, r.start) / r.start) / Math.log(r.goal / r.start) * 100));
+  // Animierte Strecke für eine laufende Wette: von jetzt bis zum Betrag bei Gewinn
+  const gainBar = (from, to) => to > from ? `<span class="gain" style="left:${from}%;width:${(to - from).toFixed(2)}%"></span><span class="goal-tick" style="left:${to}%" title="bei Gewinn"></span>` : "";
   function lane(bot, r, cls) {
     const o = r.open;
     return `<div class="lane ${cls}"><div class="nm">${esc(bot.bot.name)}<small>Versuch ${r.attempts}</small></div><div class="amt">${num(r.bank)}<small>CHF</small></div>
-      <div class="road"><span class="fill" style="width:${pos(r, r.bank)}%"></span>${r.peak > r.bank ? `<span class="pk" style="left:${pos(r, r.peak)}%" title="Höchststand"></span>` : ""}<span class="car" style="left:${pos(r, r.bank)}%"></span></div>
+      <div class="road"><span class="fill" style="width:${pos(r, r.bank)}%"></span>${o ? gainBar(pos(r, r.bank), pos(r, r.bank * o.odds)) : ""}${r.peak > r.bank ? `<span class="pk" style="left:${pos(r, r.peak)}%" title="Höchststand"></span>` : ""}<span class="car" style="left:${pos(r, r.bank)}%"></span></div>
       <div class="meta"><span>${r.streak} ${r.streak === 1 ? "Sieg" : "Siege"} in Folge · Hoch ${num(r.peak, 0)}</span><span>${o ? `läuft: ${o.legs.length > 1 ? o.legs.length + "er-Kombi" : esc(o.legs[0].label)} · ${num(o.odds)}` : r.has ? "keine Wette offen" : "keine Challenge-Daten"}</span></div></div>`;
   }
   function raceChart(ra, rb) {
@@ -349,7 +363,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return `<div class="panel ch ${cls}">
       <div class="top"><h3>${esc(bot.bot.name)}</h3><span class="muted" style="font-size:12.5px">Versuch ${s.cur.n} · ${s.curWins} ${s.curWins === 1 ? "Sieg" : "Siege"}</span></div>
       <div class="bank">${num(s.cur.bank)}<small>${esc(s.c.currency || "CHF")}</small></div>
-      <div class="track"><i style="width:${Math.max(1.5, pos(s.cur.bank))}%"></i>${s.peak > s.cur.bank ? `<em style="left:${pos(s.peak)}%" title="Rekord"></em>` : ""}</div>
+      <div class="track"><i style="width:${Math.max(1.5, pos(s.cur.bank))}%"></i>${o ? gainBar(pos(s.cur.bank), pos(s.cur.bank * o.odds)) : ""}${s.peak > s.cur.bank ? `<em style="left:${pos(s.peak)}%" title="Rekord"></em>` : ""}</div>
       <dl><div><dt>Rekord</dt><dd>${num(s.peak, 0)}</dd></div><div><dt>Versuche</dt><dd>${s.attempts}</dd></div><div><dt>Treffer</dt><dd>${pct(s.rate)}</dd></div></dl>
       ${o ? `<div class="cur"><b>${o.legs.length > 1 ? o.legs.length + "er-Kombi" : esc(o.legs[0].label)}</b> · Quote ${num(o.odds)}
         <small>${o.legs.map((l) => `${esc(l.home)} – ${esc(l.away)}${o.legs.length > 1 ? " (" + esc(l.label) + ")" : ""}`).join(" + ")}</small>
