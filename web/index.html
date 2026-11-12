@@ -392,6 +392,8 @@ form.sim { display: grid; gap: 14px; }
 .dpill.on i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
 .dpill.off i { background: var(--bad); }
 .dpill small { font-weight: 500; color: var(--muted); }
+.duel-status .dlink { margin-left: auto; font-weight: 700; color: var(--home); text-decoration: none; white-space: nowrap; }
+@media (hover: hover) { .duel-status .dlink:hover { text-decoration: underline; } }
 .ch-hero { padding: 18px 18px 16px; }
 .ch-hero .lbl { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .ch-hero .bank { font: 700 46px/1 var(--font-display); margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
@@ -1952,7 +1954,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const me = await checkDuel("duel.json");
     const other = cfg.partner_url ? await checkDuel(cfg.partner_url) : { ok: false, why: "kein Gegner eingetragen" };
     const pill = (name, r) => `<span class="dpill ${r.ok ? "on" : "off"}"><i></i>${esc(name)}: ${r.ok ? "Connected" : "Not connected"}${r.ok ? "" : ` <small>(${esc(r.why)})</small>`}</span>`;
-    const h = `<span class="dlabel">Tippduell</span>${pill("GoalOracle", me)}${pill(other.name || "Gegner", other)}`;
+    const h = `<span class="dlabel">Tippduell</span>${pill("GoalOracle", me)}${pill(other.name || "Gegner", other)}<a class="dlink" href="vergleich.html">Zum Vergleich →</a>`;
     duelCache = { t: Date.now(), h };
     return h;
   }
