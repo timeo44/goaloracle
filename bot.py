@@ -120,6 +120,15 @@ def paper_text(new_bets: list[dict], paper: dict, site: str) -> str:
     n = len(new_bets)
     lines = [f"🎯 <b>Testlauf</b> · {'neue Wette' if n == 1 else f'{n} neue Wetten'}"]
     for b in new_bets:
+        if b.get("legs"):
+            parts = []
+            for leg in b["legs"]:
+                lko = E.parse_date(leg["kickoff"]).astimezone(TZ)
+                lh, la = leg["match"].split(" – ", 1)
+                parts.append(f"• {esc(label(leg['key'], lh, la))} ({leg['odds']:.2f})\n  {esc(leg['match'])} · {WD[lko.weekday()]} {lko:%H:%M}")
+            lines.append(f"<b>{esc(b['match'])}</b> · jeder Tipp mind. 70 %, zusammen {b['p'] * 100:.0f}%\n" + "\n".join(parts) +
+                         f"\nEinsatz {b['stake']:.2f} CHF · Quote {b['odds']:.2f} · möglicher Gewinn {b['stake'] * b['odds']:.2f} CHF")
+            continue
         ko = E.parse_date(b["kickoff"]).astimezone(TZ)
         h, a = b["match"].split(" – ", 1) if " – " in b["match"] else (b["match"], "")
         val = f" · Value {b['ev'] * 100:+.0f}%" if b.get("ev") is not None and b["ev"] >= 0.03 else ""

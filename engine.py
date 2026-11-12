@@ -319,81 +319,174 @@ def build_sim(events: list[dict], now: datetime, params: Params, tuned_rows: lis
 
 
 # ---------------- Spielgeld-Konto ----------------
-def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now: datetime) -> dict:
-    cfg = C.PAPER
-    R = C.RISK[cfg["risk"]]
-    if not state:
-        state = {"start": cfg["start_budget"], "balance": cfg["start_budget"], "since": now.isoformat(),
-                 "config": cfg, "bets": [], "curve": [[now.date().isoformat(), cfg["start_budget"]]]}
-    # 1. offene Wetten abrechnen
-    for b in state["bets"]:
-        if b["status"] != "open":
-            continue
-        e = events_by_id.get(b["id"])
-        if not e:
-            continue
-        if e["status"] in DEAD or (e["completed"] and e["status"] not in FINAL_90):
-            b["status"], b["payout"] = "void", b["stake"]  # Abbruch/Verlängerung: Einsatz zurück
-        elif e["completed"] and e["hs"] is not None:
-            hit = outcome_hit(b["key"], e["hs"], e["as"])
-            b["status"] = "won" if hit else "lost"
-            b["payout"] = round(b["stake"] * b["odds"], 2) if hit else 0.0
-            b["result"] = [e["hs"], e["as"]]
-        if b["status"] != "open":
-            state["balance"] = round(state["balance"] + b["payout"], 2)
-    # 2. neue Wetten für Spiele der nächsten 24 Stunden
-    placed = {b["id"] for b in state["bets"]}
-    allowed = set()
-    if "1X2" in cfg["markets"]:
-        allowed |= {"1", "X", "2"}
-    # Strategie: pro Spiel der beste Tipp der App, der eine echte Marktquote hat.
-    # Value-Tipps zuerst, sonst der wahrscheinlichste Tipp im Quotenbereich des Risikoprofils.
-    cands = []
+PAPER_TZ = __import__("zoneinfo").ZoneInfo("Europe/Zurich")
+
+
+def _settle_leg(leg: dict, e: dict | None) -> None:
+    """Setzt status/result eines Wett-Teils (Einzelwette oder Kombi-Teil)."""
+    if not e:
+        return
+    if e["status"] in DEAD or (e["completed"] and e["status"] not in FINAL_90):
+        leg["status"] = "void"          # Abbruch/Verlängerung: zählt als nicht gespielt
+    elif e["completed"] and e["hs"] is not None:
+        leg["status"] = "won" if outcome_hit(leg["key"], e["hs"], e["as"]) else "lost"
+        leg["result"] = [e["hs"], e["as"]]
+
+
+def _paper_cands(upcoming, placed, now, hours, lo, hi, R, allowed, cfg):
+    """Pro Spiel der beste Tipp mit echter Marktquote im Quotenbereich lo–hi."""
+    out = []
     for u in upcoming:
         if u["id"] in placed or not u["odds"] or not u["known"]:
             continue
         ko = parse_date(u["kickoff"])
-        if not (now < ko <= now + timedelta(hours=24)):
+        if not (now + timedelta(minutes=15) < ko <= now + timedelta(hours=hours)):
             continue
         best = None
         for k, o in u["odds"].items():
-            if not (k in allowed or ("OU" in cfg["markets"] and k[0] in "OU")):
+            if not (k in allowed or ("OU" in cfg["markets"] and k[0] in "OU" and k.endswith(".5"))):
                 continue
             p = u["m"].get(k)
-            if p is None or not (R["min_odds"] <= o <= R["max_odds"]):
+            if p is None or not (lo <= o <= hi):
                 continue
             ev = p * o - 1
             score = (1, ev) if ev >= R["min_ev"] else (0, p)
             if best is None or score > best[0]:
                 best = (score, ev, u, k, p, o)
         if best:
-            cands.append(best)
-    cands.sort(key=lambda x: x[0], reverse=True)
-    cands = [c[1:] for c in cands]
-    used = set()
-    # Tageslimit über alle Läufe des Tages (es wird alle 2 Stunden gerechnet)
-    n = sum(1 for b in state["bets"] if b.get("placed", "")[:10] == now.date().isoformat())
-    for ev, u, k, p, eff in cands:
-        if u["id"] in used or n >= cfg["max_bets_per_day"]:
+            out.append(best)
+    out.sort(key=lambda x: x[0], reverse=True)
+    return [c[1:] for c in out]
+
+
+def _best_combo(upcoming, now, R, allowed, cfg):
+    """Kombi nur, wenn sie sehr wahrscheinlich ist: jeder Teil mind. 70 %, zusammen mind. 55 %."""
+    from itertools import combinations
+    legs = []
+    for u in upcoming:
+        if not u["odds"] or not u["known"]:
             continue
-        stake = cfg["stake"] if cfg["stake_mode"] == "fix" else state["balance"] * cfg["stake"] / 100
-        stake = round(min(stake, state["balance"]), 2)
+        ko = parse_date(u["kickoff"])
+        if not (now + timedelta(minutes=15) < ko <= now + timedelta(hours=48)):
+            continue
+        best = None
+        for k, o in u["odds"].items():
+            if not (k in allowed or ("OU" in cfg["markets"] and k[0] in "OU" and k.endswith(".5"))):
+                continue
+            p = u["m"].get(k)
+            if p is None or o < 1.15 or p < C.PAPER["combo_min_leg_p"] or p * o < 0.92:   # nicht schlechter als die übliche Buchmacher-Marge
+                continue
+            if best is None or p > best[2]:
+                best = (u, k, p, o)
+        if best:
+            legs.append(best)
+    legs.sort(key=lambda x: x[2], reverse=True)
+    legs = legs[:7]
+    best = None
+    for n in range(2, min(R["max_legs"], 3) + 1):
+        for combo in combinations(legs, n):
+            p = math.prod(x[2] for x in combo)
+            o = math.prod(x[3] for x in combo)
+            if p < C.PAPER["combo_min_p"] or o < C.PAPER["combo_min_odds"]:
+                continue
+            key = (p * o - 1, p)
+            if best is None or key > best[0]:
+                best = (key, combo, p, o)
+    return best
+
+
+def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now: datetime) -> dict:
+    """Spielgeld-Konto: wettet jeden Tag automatisch (Einzelwetten, dazu eine Kombi, wenn sie sehr sicher ist)."""
+    cfg = C.PAPER
+    R = C.RISK[cfg["risk"]]
+    if not state:
+        state = {"start": cfg["start_budget"], "balance": cfg["start_budget"], "since": now.isoformat(),
+                 "bets": [], "curve": [[now.date().isoformat(), cfg["start_budget"]]]}
+    state["config"] = cfg
+    # 1. offene Wetten abrechnen
+    for b in state["bets"]:
+        if b["status"] != "open":
+            continue
+        if b.get("legs"):
+            for leg in b["legs"]:
+                if leg.get("status", "open") == "open":
+                    _settle_leg(leg, events_by_id.get(leg["id"]))
+            st = [leg.get("status", "open") for leg in b["legs"]]
+            if "lost" in st:
+                b["status"], b["payout"] = "lost", 0.0
+            elif "open" not in st:
+                q = math.prod(leg["odds"] for leg in b["legs"] if leg["status"] == "won")
+                if all(x == "void" for x in st):
+                    b["status"], b["payout"] = "void", b["stake"]
+                else:
+                    b["status"], b["payout"] = "won", round(b["stake"] * q, 2)
+        else:
+            _settle_leg(b, events_by_id.get(b["id"]))
+            if b["status"] == "void":
+                b["payout"] = b["stake"]
+            elif b["status"] in ("won", "lost"):
+                b["payout"] = round(b["stake"] * b["odds"], 2) if b["status"] == "won" else 0.0
+        if b["status"] != "open":
+            state["balance"] = round(state["balance"] + b["payout"], 2)
+
+    # 2. neue Wetten
+    allowed = {"1", "X", "2"} if "1X2" in cfg["markets"] else set()
+    today = now.astimezone(PAPER_TZ).date().isoformat()
+    placed_today = lambda: [b for b in state["bets"]
+                            if parse_date(b["placed"]).astimezone(PAPER_TZ).date().isoformat() == today]
+    stake_for = lambda f=1.0: round(min((cfg["stake"] if cfg["stake_mode"] == "fix"
+                                         else state["balance"] * cfg["stake"] / 100) * f, state["balance"]), 2)
+
+    def place(u, k, p, o, ev):
+        stake = stake_for()
         if stake < 0.5:
-            break
+            return False
         state["balance"] = round(state["balance"] - stake, 2)
         state["bets"].append({"id": u["id"], "placed": now.isoformat(), "kickoff": u["kickoff"],
                               "comp": u["comp"], "match": f"{u['home']['name']} – {u['away']['name']}",
-                              "key": k, "p": round(p, 3), "odds": round(eff, 2), "ev": round(ev, 3),
+                              "key": k, "p": round(p, 3), "odds": round(o, 2), "ev": round(ev, 3),
                               "stake": stake, "status": "open", "payout": None})
-        used.add(u["id"])
-        n += 1
+        return True
+
+    # Einzelwetten: zuerst wie bisher (24 Stunden, Quotenbereich des Risikoprofils).
+    # Hat er heute noch gar nicht getippt, sucht er weiter: 72 Stunden, dann breiterer Quotenbereich.
+    tiers = [(24, R["min_odds"], R["max_odds"], False), (72, R["min_odds"], R["max_odds"], True),
+             (72, 1.25, 4.0, True)]
+    for hours, lo, hi, only_if_none in tiers:
+        singles_today = [b for b in placed_today() if not b.get("legs")]
+        if only_if_none and singles_today:
+            break
+        placed = {b["id"] for b in state["bets"] if not b.get("legs")}
+        limit = cfg["max_bets_per_day"] if not only_if_none else 1
+        n = len(singles_today) if not only_if_none else 0
+        for ev, u, k, p, o in _paper_cands(upcoming, placed, now, hours, lo, hi, R, allowed, cfg):
+            if n >= limit or not place(u, k, p, o, ev):
+                break
+            n += 1
+
+    # Kombi: höchstens eine pro Tag, nur wenn sie sehr wahrscheinlich ist
+    if not any(b.get("legs") for b in placed_today()):
+        best = _best_combo(upcoming, now, R, allowed, cfg)
+        stake = stake_for(cfg["combo_stake_factor"])
+        if best and stake >= 0.5:
+            _, combo, p, o = best
+            legs = [{"id": u["id"], "kickoff": u["kickoff"], "comp": u["comp"],
+                     "match": f"{u['home']['name']} – {u['away']['name']}", "key": k,
+                     "p": round(pp, 3), "odds": round(oo, 2), "status": "open"} for u, k, pp, oo in combo]
+            state["balance"] = round(state["balance"] - stake, 2)
+            state["bets"].append({"id": "kombi-" + "-".join(x["id"] for x in legs), "placed": now.isoformat(),
+                                  "kickoff": max(x["kickoff"] for x in legs), "comp": "kombi",
+                                  "match": f"{len(legs)}er-Kombi", "key": "kombi", "legs": legs,
+                                  "p": round(p, 3), "odds": round(o, 2), "ev": round(p * o - 1, 3),
+                                  "stake": stake, "status": "open", "payout": None})
+
     open_stakes = sum(b["stake"] for b in state["bets"] if b["status"] == "open")
-    today = now.date().isoformat()
     total = round(state["balance"] + open_stakes, 2)
-    if state["curve"] and state["curve"][-1][0] == today:
+    day = now.date().isoformat()
+    if state["curve"] and state["curve"][-1][0] == day:
         state["curve"][-1][1] = total
     else:
-        state["curve"].append([today, total])
+        state["curve"].append([day, total])
     return state
 
 

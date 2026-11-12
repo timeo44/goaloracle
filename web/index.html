@@ -388,6 +388,16 @@ form.sim { display: grid; gap: 14px; }
 .send-box .btn.confirm { background: var(--bad); border-color: var(--bad); }
 .send-box .note { margin: 0; text-align: center; }
 #view-top5 .send-box { margin-top: 12px; }
+.pbets { list-style: none; margin: 0; padding: 0; }
+.pb { display: flex; gap: 12px; justify-content: space-between; padding: 11px 16px; border-top: 1px solid var(--line); }
+.pb:first-child { border-top: 0; }
+.pb-main { min-width: 0; font-size: 14px; }
+.pb-main small, .pb-leg small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.pb-leg { display: flex; gap: 8px; margin-top: 7px; }
+.pb-leg i { font-style: normal; width: 12px; flex: none; text-align: center; }
+.pb-side { text-align: right; flex: none; }
+.pb-side small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.leg-won { color: var(--good); font-weight: 700; } .leg-lost { color: var(--bad); font-weight: 700; } .leg-open, .leg-void { color: var(--muted); }
 .tl-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px; color: inherit; text-decoration: none; }
 .tl-link > svg:first-child { width: 22px; height: 22px; flex: none; color: var(--muted); }
 .tl-link span { flex: 1; min-width: 0; }
@@ -1793,10 +1803,14 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const inPlay = open.reduce((a, b) => a + b.stake, 0), total = paper.balance + inPlay, profit = total - paper.start;
     const won = done.filter((b) => b.status === "won").length;
     const c = paper.config || {};
-    const row = (b) => `<tr><td class="muted">${fShort.format(new Date(b.kickoff))}</td><td>${esc(b.match)}<br><span class="muted" style="font-size:12.5px">${esc(compName(b.comp, true))}</span></td>
-      <td><b>${esc(label(b.key, { home: { name: b.match.split(" – ")[0] }, away: { name: b.match.split(" – ")[1] } }))}</b>${b.result ? `<br><span class="muted" style="font-size:12.5px">Endstand ${b.result[0]}:${b.result[1]}</span>` : ""}</td>
-      <td class="num">${b.odds.toFixed(2)}</td><td class="num">${chf(b.stake)}</td>
-      <td><span class="status ${b.status}">${{ open: "offen", won: "+" + chf((b.payout || 0) - b.stake), lost: "−" + chf(b.stake), void: "zurück" }[b.status]}</span></td></tr>`;
+    const lbl = (key, match) => esc(label(key, { home: { name: match.split(" – ")[0] }, away: { name: (match.split(" – ")[1] || "") } }));
+    const legMark = (st) => `<i class="leg-${st || "open"}">${st === "won" ? "✓" : st === "lost" ? "✗" : st === "void" ? "–" : "·"}</i>`;
+    const statusTag = (b) => `<span class="status ${b.status}">${{ open: "offen", won: "+" + chf((b.payout || 0) - b.stake), lost: "−" + chf(b.stake), void: "zurück" }[b.status]}</span>`;
+    const row = (b) => `<li class="pb">
+      <div class="pb-main">${b.legs
+        ? `<b>${esc(b.match)}</b> <span class="muted">· Chance ${pct(b.p)}</span>${b.legs.map((l) => `<div class="pb-leg">${legMark(l.status)}<span><b>${lbl(l.key, l.match)}</b> · ${l.odds.toFixed(2)}<small>${esc(l.match)} · ${fShort.format(new Date(l.kickoff))}${l.result ? " · " + l.result.join(":") : ""}</small></span></div>`).join("")}`
+        : `<b>${lbl(b.key, b.match)}</b><small>${esc(b.match)} · ${esc(compName(b.comp, true))} · ${fShort.format(new Date(b.kickoff))}${b.result ? " · Endstand " + b.result.join(":") : ""}</small>`}</div>
+      <div class="pb-side">${statusTag(b)}<small>${chf(b.stake)} × ${b.odds.toFixed(2)}</small></div></li>`;
     el.innerHTML = `<dl class="kpis">
         <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Kontostand</dt><dd>${chf(total)}<small>Start ${chf(paper.start)} CHF am ${fDate.format(new Date(paper.since))}</small></dd></div>
         <div class="kpi ${profit >= 0 ? "good" : "bad"}"><dt>Gewinn</dt><dd>${profit >= 0 ? "+" : ""}${chf(profit)}<small>${pct(profit / paper.start)} seit Start</small></dd></div>
@@ -1805,10 +1819,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       </dl>
       ${paper.curve.length > 1 ? `<div class="panel"><div class="panel-h"><h3>Kontoverlauf</h3></div><div class="panel-b">${chart(paper.curve, paper.start)}</div></div>` : ""}
       <div class="panel"><div class="panel-h"><h3>Wetten</h3><span class="muted" style="font-size:12.5px">Risiko ${esc(c.risk || "")} · ${c.stake_mode === "fix" ? chf(c.stake) + " CHF" : (c.stake || "") + " % vom Konto"} pro Tipp</span></div>
-        ${paper.bets.length ? `<div class="table-wrap"><table class="rank"><thead><tr><th>Spiel</th><th>Partie</th><th>Tipp</th><th class="num">Quote</th><th class="num">Einsatz</th><th></th></tr></thead><tbody>${[...open, ...done.slice().reverse()].slice(0, 60).map(row).join("")}</tbody></table></div>`
+        ${paper.bets.length ? `<ul class="pbets">${[...open, ...done.slice().reverse()].slice(0, 60).map(row).join("")}</ul>`
         : `<div class="empty"><strong>Noch keine Wetten</strong>Der Bot wettet nur, wenn Marktquoten vorliegen und ein Tipp genug Value hat. ${data.odds.key ? "" : "Dafür fehlt noch der Odds-API-Key."}</div>`}
       </div>
-      <p class="note">Virtuelles Geld. Der Bot setzt jeden Morgen auf die besten Tipps der App für Spiele der nächsten 24 Stunden, zu den aktuellen Marktquoten. Value-Tipps zuerst, sonst der wahrscheinlichste Tipp im Quotenbereich. Die Regeln stehen in config.py (PAPER).</p>`;
+      <p class="note">Virtuelles Geld. Der Bot setzt jeden Tag auf die besten Tipps der App für Spiele der nächsten 24 Stunden, zu den aktuellen Marktquoten: Value-Tipps zuerst, sonst der wahrscheinlichste Tipp im Quotenbereich. Gibt es da nichts, schaut er bis 3 Tage voraus. Dazu höchstens eine Kombi pro Tag mit halbem Einsatz, aber nur, wenn jeder Tipp mindestens 70 % und die ganze Kombi mindestens 55 % Chance hat. Jede neue Wette kommt per Telegram.</p>`;
   }
   $("#tl-sim").addEventListener("click", () => { tlMode = "sim"; $("#sim-pane").hidden = false; $("#paper-pane").hidden = true; $("#tl-sim").setAttribute("aria-pressed", "true"); $("#tl-paper").setAttribute("aria-pressed", "false"); });
   $("#tl-paper").addEventListener("click", () => { tlMode = "paper"; $("#sim-pane").hidden = true; $("#paper-pane").hidden = false; $("#tl-paper").setAttribute("aria-pressed", "true"); $("#tl-sim").setAttribute("aria-pressed", "false"); renderPaper(); });

@@ -108,4 +108,9 @@ PAPER = {
     "stake": 2.0,
     "max_bets_per_day": 6,
     "markets": ["1X2", "OU"],  # nur Märkte mit echten Quoten
+    # Kombi (höchstens eine pro Tag) nur, wenn sie sehr wahrscheinlich ist
+    "combo_min_leg_p": 0.70,   # jeder Teil mindestens 70 %
+    "combo_min_p": 0.55,       # die ganze Kombi mindestens 55 %
+    "combo_min_odds": 1.35,    # sonst lohnt sich die Kombi nicht
+    "combo_stake_factor": 0.5, # halber Einsatz
 }
