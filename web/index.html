@@ -385,6 +385,13 @@ form.sim { display: grid; gap: 14px; }
 @media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
 .btn:disabled { opacity: .55; cursor: progress; }
 .spseg { max-width: 300px; margin-bottom: 12px; }
+.duel-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13px; }
+.duel-status .dlabel { font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dpill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.dpill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dpill.on i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.dpill.off i { background: var(--bad); }
+.dpill small { font-weight: 500; color: var(--muted); }
 .ch-hero { padding: 18px 18px 16px; }
 .ch-hero .lbl { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .ch-hero .bank { font: 700 46px/1 var(--font-display); margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
@@ -1922,7 +1929,32 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       </dl>
       ${steps ? `<h2 class="sec" style="margin-top:22px">Versuch ${att.n}</h2><div class="panel"><ol class="ch-steps">${steps}</ol></div>` : ""}
       ${past ? `<h2 class="sec" style="margin-top:22px">Frühere Versuche</h2><div class="panel">${past}</div>` : ""}
-      <p class="note">So funktioniert's: Start mit 100 CHF (Spielgeld). Immer nur eine Wette gleichzeitig. Der ganze Betrag wird weiter eingesetzt und jede Wette soll ihn etwa verdoppeln: 100 → 200 → 400 → 800 … nach rund 10 Siegen sind es 100'000. Ist eine Wette abgerechnet, kann am selben Tag die nächste folgen. Eine verlorene Wette beendet den Versuch, dann geht es wieder bei 100 CHF los. GoalOracle nimmt jeweils die sicherste Wette mit echter Quote: Einzeltipp, 2er- oder 3er-Kombi mit Gesamtquote 1.85 bis 2.30, davon die mit der höchsten Chance. Jede Wette und jedes Ergebnis kommt per Telegram.</p>`;
+      <p class="note">So funktioniert's: Start mit 100 CHF (Spielgeld). Immer nur eine Wette gleichzeitig. Der ganze Betrag wird weiter eingesetzt und jede Wette soll ihn etwa verdoppeln: 100 → 200 → 400 → 800 … nach rund 10 Siegen sind es 100'000. Ist eine Wette abgerechnet, kann am selben Tag die nächste folgen. Eine verlorene Wette beendet den Versuch, dann geht es wieder bei 100 CHF los. GoalOracle nimmt jeweils die sicherste Wette mit echter Quote: Einzeltipp, 2er- oder 3er-Kombi mit Gesamtquote 1.85 bis 2.30, davon die mit der höchsten Chance. Jede Wette und jedes Ergebnis kommt per Telegram.</p>
+      <div class="duel-status" id="duel-status"><span class="muted">Tippduell: Verbindung wird geprüft …</span></div>`;
+    duelStatus().then((h) => { const d = $("#duel-status"); if (d) d.innerHTML = h; });
+  }
+  // Tippduell-Verbindung: verbunden = Datei im Format tippduell/1 erreichbar und höchstens 26 Std. alt
+  async function checkDuel(url) {
+    try {
+      const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return { ok: false, why: "nicht erreichbar (" + r.status + ")" };
+      const j = await r.json();
+      if (!String(j.format || "").startsWith("tippduell/")) return { ok: false, why: "falsches Format" };
+      const age = (Date.now() - new Date(j.updated).getTime()) / 3600e3;
+      if (!(age <= 26)) return { ok: false, name: j.bot && j.bot.name, why: "seit " + Math.round(age) + " Std. nicht aktualisiert" };
+      return { ok: true, name: j.bot && j.bot.name };
+    } catch (e) { return { ok: false, why: "nicht erreichbar" }; }
+  }
+  let duelCache = null;
+  async function duelStatus() {
+    if (duelCache && Date.now() - duelCache.t < 300e3) return duelCache.h;
+    const cfg = await fetch("duel-config.json?t=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    const me = await checkDuel("duel.json");
+    const other = cfg.partner_url ? await checkDuel(cfg.partner_url) : { ok: false, why: "kein Gegner eingetragen" };
+    const pill = (name, r) => `<span class="dpill ${r.ok ? "on" : "off"}"><i></i>${esc(name)}: ${r.ok ? "Connected" : "Not connected"}${r.ok ? "" : ` <small>(${esc(r.why)})</small>`}</span>`;
+    const h = `<span class="dlabel">Tippduell</span>${pill("GoalOracle", me)}${pill(other.name || "Gegner", other)}`;
+    duelCache = { t: Date.now(), h };
+    return h;
   }
   document.addEventListener("click", (e) => { const b = e.target.closest(".spseg [data-go]"); if (b) location.hash = b.dataset.go; });
 

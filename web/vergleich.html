@@ -117,6 +117,11 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; }
 .empty strong { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
+.conn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; margin-top: 6px; }
+.conn i { width: 8px; height: 8px; border-radius: 50%; }
+.conn.on i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); } .conn.off i { background: var(--bad); }
+.conn small { font-weight: 500; color: var(--muted); }
+.connbox { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin-top: 14px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; }
 /* Duell-Rennen */
 .race { padding: 16px; }
@@ -175,6 +180,13 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   const STATUS = { won: "✓", lost: "✗", void: "abgesagt", open: "offen" };
 
   let A = null, B = null, errB = "", period = "common", mobSide = "a";
+  // verbunden = Datei im Format tippduell/1 erreichbar und höchstens 26 Std. alt
+  function conn(bot, err) {
+    if (!bot) return { ok: false, why: err ? "nicht erreichbar" : "kein Link" };
+    const age = (Date.now() - new Date(bot.updated).getTime()) / 3600e3;
+    return age <= 26 ? { ok: true } : { ok: false, why: "seit " + Math.round(age) + " Std. nicht aktualisiert" };
+  }
+  const connHtml = (c) => `<span class="conn ${c.ok ? "on" : "off"}"><i></i>${c.ok ? "Connected" : "Not connected"}${c.ok ? "" : ` <small>(${esc(c.why)})</small>`}</span>`;
 
   async function load(url) {
     const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
@@ -375,15 +387,16 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   function render() {
     const app = $("#app");
     const nameA = A ? A.bot.name : "GoalOracle", nameB = B ? B.bot.name : "Gegner";
-    const head = `<div class="vs"><div class="side"><div class="name a">${esc(nameA)}</div><div class="who">${A ? esc(A.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(A.updated))) : ""}</div></div>
+    const cA = conn(A, true), cB = conn(B, !!SRC[1]);
+    const head = `<div class="vs"><div class="side"><div class="name a">${esc(nameA)}</div><div class="who">${A ? esc(A.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(A.updated))) : ""}</div>${connHtml(cA)}</div>
       <div class="mid">VS</div>
-      <div class="side"><div class="name b">${esc(nameB)}</div><div class="who">${B ? esc(B.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(B.updated))) : ""}</div></div></div>`;
+      <div class="side"><div class="name b">${esc(nameB)}</div><div class="who">${B ? esc(B.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(B.updated))) : ""}</div>${connHtml(cB)}</div></div>`;
     if (!A) { app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>Eigene Daten fehlen</strong>duel.json konnte nicht geladen werden.</div>`; return; }
     if (!B) {
       app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>${SRC[1] ? "Daten des Gegners nicht erreichbar" : "Gegner noch nicht verbunden"}</strong>${SRC[1]
         ? `Unter <code>${esc(SRC[1])}</code> kam keine gültige tippduell-Datei (${esc(errB)}). Die Datei muss öffentlich und ohne Login erreichbar sein.`
         : "Sobald die URL zu seiner duel.json eingetragen ist, erscheint hier der Vergleich."}</div>
-        <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}` + soloView();
+        <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}` + soloView().replace("<footer>", `<div class="panel connbox"><span><b class="a">${esc(nameA)}</b> ${connHtml(cA)}</span><span><b class="b">${esc(nameB)}</b> ${connHtml(cB)}</span></div><footer>`);
       return;
     }
     const firstOf = (bot) => bot.tips.reduce((m, t) => (!m || (t.placed || t.kickoff) < m ? t.placed || t.kickoff : m), null);
@@ -428,6 +441,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
       <div class="lists one-${mobSide}" style="margin-top:10px">
         <div class="panel la"><div class="head">${esc(nameA)}</div><ul class="tips">${recent(A, from)}</ul></div>
         <div class="panel lb"><div class="head">${esc(nameB)}</div><ul class="tips">${recent(B, from)}</ul></div></div>
+      <div class="panel connbox"><span><b class="a">${esc(nameA)}</b> ${connHtml(cA)}</span><span><b class="b">${esc(nameB)}</b> ${connHtml(cB)}</span></div>
       <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1 · Daten: <a href="${esc(SRC[0])}" style="color:inherit">${esc(nameA)}</a> · <a href="${esc(SRC[1])}" style="color:inherit">${esc(nameB)}</a></footer>`;
   }
   const recent = (bot, from) => bot.tips.filter((t) => inPeriod(t, from)).sort((x, y) => (y.kickoff > x.kickoff ? 1 : -1)).slice(0, 15).map(tipLi).join("") || `<li class="muted">Noch keine Tipps.</li>`;
