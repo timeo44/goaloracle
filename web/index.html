@@ -384,6 +384,42 @@ form.sim { display: grid; gap: 14px; }
 .btn { appearance: none; border: 0; border-radius: var(--radius); background: var(--home); color: var(--surface); font: 700 17px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: 13px 16px; cursor: pointer; }
 @media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
 .btn:disabled { opacity: .55; cursor: progress; }
+.spseg { max-width: 300px; margin-bottom: 12px; }
+.ch-hero { padding: 18px 18px 16px; }
+.ch-hero .lbl { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ch-hero .bank { font: 700 46px/1 var(--font-display); margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+.ch-hero .bank small { font-size: 20px; color: var(--muted); margin-left: 4px; }
+.ch-hero .sub { color: var(--muted); font-size: 13px; }
+.ladder { position: relative; height: 54px; margin: 18px 4px 0; }
+.ladder .track { position: absolute; left: 0; right: 0; top: 14px; height: 8px; border-radius: 4px; background: var(--sunken); }
+.ladder .fill { position: absolute; left: 0; top: 14px; height: 8px; border-radius: 4px; background: var(--home); }
+.ladder .best { position: absolute; top: 9px; width: 2px; height: 18px; background: var(--muted); }
+.ladder .dot { position: absolute; top: 18px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--surface); }
+.ladder .tick { position: absolute; top: 30px; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ladder .tick:first-of-type { transform: none; } .ladder .tick.end { transform: translateX(-100%); }
+.ch-bet { padding: 14px 16px; }
+.ch-bet .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ch-bet h3 { margin: 0; font: 700 18px/1.1 var(--font-display); text-transform: uppercase; }
+.ch-leg { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.ch-leg:first-of-type { border-top: 0; }
+.ch-leg small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ch-flow { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+.ch-flow b { font: 700 22px/1 var(--font-display); }
+.ch-flow .arr { color: var(--muted); }
+.ch-flow .p { margin-left: auto; text-align: right; font-size: 12.5px; color: var(--muted); }
+.ch-steps { list-style: none; margin: 0; padding: 0; }
+.ch-steps li { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; }
+.ch-steps li:first-child { border-top: 0; }
+.ch-steps .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 13px/1 var(--font-display); background: var(--sunken); color: var(--muted); }
+.ch-steps .won .n { background: var(--good); color: #fff; } .ch-steps .lost .n { background: var(--bad); color: #fff; }
+.ch-steps small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ch-steps .amt { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+.ch-att { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.ch-att:first-child { border-top: 0; }
+.ch-att .bar { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.ch-att .bar i { display: block; height: 100%; background: var(--home); opacity: .75; }
+.ch-att .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ch-att .r small { display: block; color: var(--muted); font-size: 12px; }
 .send-box { display: grid; gap: 8px; }
 .send-box .btn.confirm { background: var(--bad); border-color: var(--bad); }
 .send-box .note { margin: 0; text-align: center; }
@@ -529,8 +565,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4Z"/><path d="M14 5v12" stroke-dasharray="2 2"/></svg>Tipps</button>
       <button class="tab" role="tab" data-view="top5" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/></svg>Top 5</button>
-      <button class="tab" role="tab" data-view="ranking" aria-selected="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Ranking</button>
+      <button class="tab" role="tab" data-view="challenge" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4"/></svg>Challenge</button>
       <button class="tab" role="tab" data-view="bilanz" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12l5 5L20 6"/></svg>Bilanz</button>
     </nav>
@@ -547,6 +583,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   <div id="notice" class="notice" hidden></div>
 
   <section class="view" id="view-spiele">
+    <div class="seg spseg" role="group" aria-label="Ansicht"><button type="button" data-go="spiele" aria-pressed="true">Spiele</button><button type="button" data-go="ranking" aria-pressed="false">Ranking</button></div>
     <div class="chips" id="comp-chips" role="group" aria-label="Wettbewerb"></div>
     <div id="slips"></div>
     <div id="matches"></div>
@@ -633,7 +670,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     <div id="paper-pane" style="margin-top:12px;display:grid;gap:14px"></div>
   </section>
 
+  <section class="view" id="view-challenge" hidden></section>
+
   <section class="view" id="view-ranking" hidden>
+    <div class="seg spseg" role="group" aria-label="Ansicht"><button type="button" data-go="spiele" aria-pressed="false">Spiele</button><button type="button" data-go="ranking" aria-pressed="true">Ranking</button></div>
     <div class="chips" id="rank-chips" role="group" aria-label="Liga"></div>
     <div class="panel table-wrap" style="margin-top:8px"><table class="rank" id="rank"></table></div>
     <p class="note">Erwartete Tore pro Spiel gegen ein durchschnittliches Team der Top-5-Ligen. Alle Wettbewerbe fliessen ein, neuere Spiele zählen stärker. Form: letzte fünf Pflichtspiele.</p>
@@ -908,11 +948,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const quoteTxt = (o) => o.odds ? `Quote ${o.odds.toFixed(2)}` : `faire Quote ${o.fair.toFixed(2)}`;
 
   // ---------- Navigation ----------
-  const VIEWS = ["spiele", "spiel", "team", "tipps", "top5", "testlauf", "ranking", "bilanz", "einstellungen"];
+  const VIEWS = ["spiele", "spiel", "team", "tipps", "top5", "testlauf", "challenge", "ranking", "bilanz", "einstellungen"];
   let lastList = "spiele";
   // Jeder Bereich wird erst gebaut, wenn er sichtbar wird (spart Rechenzeit auf dem Handy)
   const dirty = new Set();
-  const RENDER = { spiele: () => renderMatches(), top5: () => { renderTop5(); renderSend(); }, tipps: () => renderTipps(), ranking: () => renderRanking(),
+  const RENDER = { spiele: () => renderMatches(), top5: () => { renderTop5(); renderSend(); }, tipps: () => renderTipps(), ranking: () => renderRanking(), challenge: () => renderChallenge(),
     bilanz: () => renderBilanz(), einstellungen: () => { renderSettings(); renderModel(); renderSend(); } };
   function markDirty(...views) { (views.length ? views : Object.keys(RENDER)).forEach((v) => dirty.add(v)); renderVisible(); }
   let currentView = null;
@@ -928,7 +968,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     renderVisible();
     // Zurück zu einer Liste: alte Scroll-Position wiederherstellen
     if (prev && prev !== v && (prev === "spiel" || prev === "team") && scrollMem[v] != null) requestAnimationFrame(() => window.scrollTo(0, scrollMem[v]));
-    const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v === "testlauf" ? "tipps" : v;
+    const tabV = v === "spiel" || v === "team" || v === "ranking" ? "spiele" : v === "testlauf" ? "tipps" : v;
     $$(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === tabV)));
     $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
@@ -1826,6 +1866,65 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   }
   $("#tl-sim").addEventListener("click", () => { tlMode = "sim"; $("#sim-pane").hidden = false; $("#paper-pane").hidden = true; $("#tl-sim").setAttribute("aria-pressed", "true"); $("#tl-paper").setAttribute("aria-pressed", "false"); });
   $("#tl-paper").addEventListener("click", () => { tlMode = "paper"; $("#sim-pane").hidden = true; $("#paper-pane").hidden = false; $("#tl-paper").setAttribute("aria-pressed", "true"); $("#tl-sim").setAttribute("aria-pressed", "false"); renderPaper(); });
+
+  // ---------- Challenge ----------
+  const fmtChf = (x) => Math.round(x).toLocaleString("de-CH");
+  const chPos = (x) => Math.max(0, Math.min(1, Math.log(Math.max(x, 100) / 100) / Math.log(1000)));
+  const legLbl = (l) => esc(label(l.key, { home: { name: l.home }, away: { name: l.away } }));
+  function renderChallenge() {
+    const el = $("#view-challenge"), C = data.challenge;
+    if (!C || !C.attempts || !C.attempts.length) {
+      el.innerHTML = `<div class="empty"><strong>Die Challenge startet beim nächsten Lauf</strong>Von 100 CHF auf 100'000 CHF, immer eine Wette nach der anderen.</div>`;
+      return;
+    }
+    const S = C.stats || {}, att = C.attempts[C.attempts.length - 1];
+    const bet = att.bets.length ? att.bets[att.bets.length - 1] : null;
+    const open = bet && bet.status === "open" ? bet : null;
+    const wins = att.bets.filter((b) => b.status === "won").length;
+    const need = Math.max(0, Math.ceil(Math.log(C.goal / att.bank) / Math.log(1.3)));
+    const ticks = [100, 1000, 10000, 100000].map((v, i, a) => `<span class="tick${i === a.length - 1 ? " end" : ""}" style="left:${chPos(v) * 100}%">${v >= 1000 ? fmtChf(v / 1000) + "k" : v}</span>`).join("");
+    const dots = Array.from({ length: 9 }, (_, i) => 200 * 2 ** i).map((v) => `<i class="dot" style="left:${chPos(v) * 100}%"></i>`).join("");
+    const legs = (b) => b.legs.map((l) => {
+      const d = new Date(l.kickoff), m = { won: "✓", lost: "✗", void: "–" }[l.status];
+      return `<a class="ch-leg" href="#spiel-${esc(l.id)}" style="color:inherit;text-decoration:none"><span><b>${legLbl(l)}</b><small>${esc(l.home)} – ${esc(l.away)} · ${esc(compName(l.comp, true))} · ${esc(fShort.format(d))} ${fTime.format(d)}</small></span>
+        <span style="text-align:right;white-space:nowrap">${m ? `<span class="leg-${l.status}">${m}${l.result ? " " + l.result.join(":") : ""}</span><br>` : ""}<span class="muted">${l.odds.toFixed(2)}</span></span></a>`;
+    }).join("");
+    const steps = att.bets.slice().reverse().map((b, i) => {
+      const n = att.bets.length - i;
+      const what = b.legs.length > 1 ? `${b.legs.length}er-Kombi` : legLbl(b.legs[0]);
+      const sub = b.legs.map((l) => `${esc(l.home)} – ${esc(l.away)}`).join(" + ");
+      const out = b.status === "won" ? `<b class="pos-d">${chf(b.payout)}</b>` : b.status === "lost" ? `<b class="neg-d">0.00</b>` : b.status === "void" ? "zurück" : "läuft";
+      return `<li class="${b.status}"><span class="n">${n}</span><span><b>${what}</b> · ${b.odds.toFixed(2)}<small>${sub}</small></span><span class="amt">${chf(b.stake)} →<br>${out}</span></li>`;
+    }).join("");
+    const past = C.attempts.slice(0, -1).reverse().slice(0, 30).map((a) => {
+      const w = a.bets.filter((b) => b.status === "won").length;
+      return `<div class="ch-att"><span><b>Versuch ${a.n}</b><br><span class="muted" style="font-size:12px">${esc(fShort.format(new Date(a.started)))}${a.ended ? " – " + esc(fShort.format(new Date(a.ended))) : ""}</span></span>
+        <span class="bar"><i style="width:${Math.max(2, chPos(a.peak) * 100)}%"></i></span>
+        <span class="r">${a.result === "won" ? "🎉 Ziel" : `${w} ${w === 1 ? "Sieg" : "Siege"}`}<small>Hoch ${chf(a.peak)}</small></span></div>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="panel ch-hero">
+        <div class="lbl">Versuch ${att.n} · ${wins} ${wins === 1 ? "Sieg" : "Siege"} in Folge</div>
+        <div class="bank">${chf(att.bank)}<small>CHF</small></div>
+        <div class="sub">Ziel 100'000 CHF · noch rund ${need} Siege bei Quote 1.30</div>
+        <div class="ladder" aria-hidden="true"><span class="track"></span>${S.best_peak > att.bank ? `<span class="best" style="left:${chPos(S.best_peak) * 100}%" title="Rekord"></span>` : ""}<span class="fill" style="width:${Math.max(1.5, chPos(att.bank) * 100)}%"></span>${dots}${ticks}</div>
+      </div>
+      ${open ? `<h2 class="sec" style="margin-top:22px">Aktuelle Wette</h2>
+      <div class="panel ch-bet"><div class="row"><h3>${open.legs.length > 1 ? open.legs.length + "er-Kombi" : "Einzeltipp"}</h3><span class="status open">läuft</span></div>
+        <div style="margin-top:6px">${legs(open)}</div>
+        <div class="ch-flow"><b>${chf(open.stake)}</b><span class="arr">→</span><b class="pos-d">${chf(open.stake * open.odds)}</b><span class="p">Quote ${open.odds.toFixed(2)}<br>Chance ${pct(open.p)}</span></div></div>`
+      : `<div class="panel" style="margin-top:16px"><div class="empty"><strong>Gerade keine Wette offen</strong>Sobald es ein passendes Spiel in den nächsten 30 Stunden gibt, setzt GoalOracle die nächste. Geprüft wird alle 2 Stunden.</div></div>`}
+      <dl class="kpis" style="margin-top:16px">
+        <div class="kpi"><dt data-tip="Wie viele Anläufe es seit dem Start gab. Jede verlorene Wette beendet einen Versuch.">Versuche</dt><dd>${S.attempts}<small>seit ${esc(fDate.format(new Date(C.since)))}</small></dd></div>
+        <div class="kpi"><dt data-tip="Höchster Betrag, den ein Versuch je erreicht hat.">Rekord</dt><dd>${chf(S.best_peak)}<small>${S.best_wins} ${S.best_wins === 1 ? "Sieg" : "Siege"} in Folge</small></dd></div>
+        <div class="kpi"><dt data-tip="Gewonnene Wetten von allen abgerechneten Challenge-Wetten.">Treffer</dt><dd>${S.bets ? Math.round(100 * S.won / S.bets) + "%" : "–"}<small>${S.won} von ${S.bets}</small></dd></div>
+        <div class="kpi ${S.goals ? "good" : ""}"><dt data-tip="Wie oft ein Versuch 100'000 CHF erreicht hat.">Ziel erreicht</dt><dd>${S.goals}<small>mal</small></dd></div>
+      </dl>
+      ${steps ? `<h2 class="sec" style="margin-top:22px">Versuch ${att.n}</h2><div class="panel"><ol class="ch-steps">${steps}</ol></div>` : ""}
+      ${past ? `<h2 class="sec" style="margin-top:22px">Frühere Versuche</h2><div class="panel">${past}</div>` : ""}
+      <p class="note">So funktioniert's: Start mit 100 CHF (Spielgeld). Immer nur eine Wette gleichzeitig. Der ganze Betrag wird weiter eingesetzt, also 100 → 126 → 160 … Ist eine Wette abgerechnet, kann am selben Tag die nächste folgen. Eine verlorene Wette beendet den Versuch, dann geht es wieder bei 100 CHF los. GoalOracle nimmt jeweils die sicherste Wette mit echter Quote: Einzeltipp oder 2er-Kombi, Gesamtquote 1.25 bis 1.60, mindestens 62 % Chance. Jede Wette und jedes Ergebnis kommt per Telegram.</p>`;
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest(".spseg [data-go]"); if (b) location.hash = b.dataset.go; });
 
   // ---------- Ranking ----------
   function renderRanking() {

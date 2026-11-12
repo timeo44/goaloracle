@@ -20,6 +20,7 @@ import requests
 import config as C
 import engine as E
 import botd as B
+import challenge as CH
 from sources import telegram as TG
 import tuning as T
 from predictor import Params, Predictor
@@ -113,6 +114,38 @@ def wait_until(hhmm: str, max_minutes: int = 45):
     if 0 < wait <= max_minutes * 60:
         print(f"Warte {wait / 60:.1f} Minuten bis {hhmm} Uhr …")
         time.sleep(wait)
+
+
+def _chf(x: float) -> str:
+    return f"{x:,.2f}".replace(",", "'")
+
+
+def challenge_text(events, site: str) -> str:
+    """Nachricht zur Challenge: neue Wette, Gewinn, Verlust oder Ziel erreicht."""
+    lines = ["🏆 <b>Challenge</b> · 100 → 100'000 CHF"]
+    for kind, att, bet in events:
+        n_won = sum(b["status"] == "won" for b in att["bets"])
+        if kind == "placed":
+            legs = []
+            for l in bet["legs"]:
+                ko = E.parse_date(l["kickoff"]).astimezone(TZ)
+                legs.append(f"• <b>{esc(label(l['key'], l['home'], l['away']))}</b> ({l['odds']:.2f})\n"
+                            f"  {esc(l['home'])} – {esc(l['away'])} · {WD[ko.weekday()]} {ko:%H:%M}")
+            lines.append(f"Versuch {att['n']} · Wette {len(att['bets'])}\n" + "\n".join(legs) +
+                         f"\nEinsatz {_chf(bet['stake'])} CHF · Quote {bet['odds']:.2f} · Chance {bet['p'] * 100:.0f}%\n"
+                         f"Bei Erfolg: {_chf(bet['stake'] * bet['odds'])} CHF")
+        elif kind == "won":
+            lines.append(f"✅ Gewonnen! Versuch {att['n']} steht jetzt bei <b>{_chf(att['bank'])} CHF</b> ({n_won} {'Sieg' if n_won == 1 else 'Siege in Folge'})")
+        elif kind == "void":
+            lines.append(f"↩️ Wette abgesagt, Einsatz zurück: {_chf(att['bank'])} CHF")
+        elif kind == "lost":
+            lines.append(f"❌ Verloren. Versuch {att['n']} endet nach {n_won} {'Sieg' if n_won == 1 else 'Siegen'} (Höchststand {_chf(att['peak'])} CHF).\n"
+                         f"Neuer Versuch startet mit 100 CHF.")
+        elif kind == "goal":
+            lines.append(f"🎉 <b>Ziel erreicht!</b> Versuch {att['n']}: {_chf(att['bank'])} CHF")
+    if site:
+        lines.append(f'<a href="{site}#challenge">Challenge ansehen</a>')
+    return "\n\n".join(lines)
 
 
 def paper_text(new_bets: list[dict], paper: dict, site: str) -> str:
@@ -247,6 +280,7 @@ def main():
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
     new_paper = [b for b in paper["bets"] if b.get("placed") == now.isoformat()]
+    chal, chal_events = CH.update(load_json(WEB / "challenge.json", None), upcoming, by_id, now)
     # Bets des Tages: um 10 Uhr (bzw. beim ersten Lauf danach) festlegen, danach nur auswerten
     local_now = now.astimezone(TZ)
     create = args.notify or args.dry_run or local_now.hour >= 10
@@ -277,6 +311,7 @@ def main():
         "history_summary": E.history_summary(history),
         "botd_today": next((d for d in botd_state["days"] if not d.get("retro") and d["day"] == B.local_day(now)), None),
         "botd_stats": {k: botd_state[k] for k in ("stats_live", "stats_retro", "stats_all")},
+        "challenge": chal,
         "comp_names": {**{k: v[0] for k, v in C.DISPLAY.items()}, **C.OTHER_NAMES},
     }
     data["forms"] = {t: fdet[t] for t in shown if t in fdet}
@@ -289,6 +324,7 @@ def main():
     data["telegram"] = TG.load(ROOT / "cache" / "telegram.json").get("title") or None
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
+    write_json(WEB / "challenge.json", chal)
     write_json(WEB / "botd.json", botd_state)
     write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
     if not args.skip_sim:
@@ -301,6 +337,17 @@ def main():
     token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
     tg_file = ROOT / "cache" / "telegram.json"
     tg = TG.find_group(token, owner, tg_file) if token and owner and not args.dry_run else {}
+    if chal_events:
+        ctext = challenge_text(chal_events, os.getenv("SITE_URL", ""))
+        if args.dry_run or not token or not owner:
+            print(ctext)
+        else:
+            try:
+                TG.send(token, tg.get("chat_id") or owner, ctext, tg)
+                TG.save(tg_file, tg)
+                print(f"Telegram: Challenge, {len(chal_events)} Ereignisse gemeldet.")
+            except RuntimeError as err:
+                print(f"Challenge-Nachricht fehlgeschlagen: {err}")
     if new_paper:
         ptext = paper_text(new_paper, paper, os.getenv("SITE_URL", ""))
         if args.dry_run or not token or not owner:

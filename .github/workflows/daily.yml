@@ -101,7 +101,7 @@ jobs:
         run: |
           git config user.name "goaloracle-bot"
           git config user.email "goaloracle-bot@users.noreply.github.com"
-          git add web/data.json web/paper.json web/sim.json web/history.json web/botd.json web/crests cache
+          git add web/data.json web/paper.json web/sim.json web/history.json web/botd.json web/challenge.json web/crests cache
           git diff --cached --quiet || git commit -m "Tipps vom $(date -u +%d.%m.%Y)"
           # Bei gleichzeitigen Änderungen gewinnen die frisch gerechneten Daten
           for i in 1 2 3; do
