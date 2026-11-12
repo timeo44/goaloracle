@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Tippduell</title>
+<title>Challenge-Duell</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,6 +121,8 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .conn i { width: 8px; height: 8px; border-radius: 50%; }
 .conn.on i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); } .conn.off i { background: var(--bad); }
 .conn small { font-weight: 500; color: var(--muted); }
+.vs .conn { flex-wrap: wrap; } .vs .side:last-child .conn { justify-content: flex-end; }
+.vs .conn small { flex-basis: 100%; }
 .connbox { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 16px; margin-top: 14px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; }
 /* Duell-Rennen */
@@ -177,10 +179,8 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   const fStamp = new Intl.DateTimeFormat("de-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" });
   const pct = (x) => (x == null || isNaN(x) ? "–" : Math.round(x * 100) + "%");
   const num = (x, d = 2) => (x == null || isNaN(x) ? "–" : (x < 0 ? "−" : "") + Math.abs(x).toLocaleString("de-CH", { minimumFractionDigits: d, maximumFractionDigits: d }));
-  const signed = (x, d = 1) => (x == null || isNaN(x) ? "–" : (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toLocaleString("de-CH", { minimumFractionDigits: d, maximumFractionDigits: d }));
-  const STATUS = { won: "✓", lost: "✗", void: "abgesagt", open: "offen" };
 
-  let A = null, B = null, errB = "", period = "common", mobSide = "a";
+  let A = null, B = null, errB = "", mobSide = "a";
   // verbunden = Datei im Format tippduell/1 erreichbar und höchstens 26 Std. alt
   function conn(bot, err) {
     if (!bot) return { ok: false, why: err ? "nicht erreichbar" : "kein Link" };
@@ -194,30 +194,10 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     if (!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
     if (!j || !String(j.format || "").startsWith("tippduell/")) throw new Error("kein tippduell-Format");
-    j.tips = (j.tips || []).filter((t) => !t.retro);   // nur live getippte Tipps zählen
     return j;
   }
 
-  // ---------- Kennzahlen ----------
-  function inPeriod(t, from) { return !from || (t.placed || t.kickoff) >= from; }
-  function stats(bot, from) {
-    const tips = bot.tips.filter((t) => inPeriod(t, from));
-    const done = tips.filter((t) => t.status === "won" || t.status === "lost");
-    const won = done.filter((t) => t.status === "won");
-    const mk = done.filter((t) => t.odds_type === "market" && t.odds);
-    const profit = mk.reduce((s, t) => s + (t.status === "won" ? t.odds - 1 : -1), 0);
-    const days = {};
-    done.forEach((t) => { (days[t.day] = days[t.day] || []).push(t); });
-    const dayRates = Object.values(days);
-    return {
-      tips: tips.length, done: done.length, won: won.length,
-      rate: done.length ? won.length / done.length : null,
-      avgOdds: done.length ? done.reduce((s, t) => s + (t.odds || 0), 0) / done.length : null,
-      avgP: done.length ? done.reduce((s, t) => s + (t.probability || 0), 0) / done.length : null,
-      mk: mk.length, profit: mk.length ? profit : null, roi: mk.length ? profit / mk.length : null,
-      perfect: dayRates.filter((d) => d.every((t) => t.status === "won")).length, days: dayRates.length,
-    };
-  }
+  // ---------- Challenge ----------
   function chStats(bot) {
     const c = bot.challenge;
     if (!c || !c.attempts || !c.attempts.length) return null;
@@ -320,54 +300,6 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     } catch (e) { busy = false; ctlMsg = "Hat nicht geklappt: " + e.message; render(); }
   }
 
-  // ---------- Gleiche Spiele finden ----------
-  const STOP = new Set(["fc", "cf", "sc", "ac", "afc", "ssc", "us", "as", "sv", "vfb", "vfl", "tsg", "fk", "sk", "cd", "ud", "rc", "real", "club", "de", "the", "1", "04", "05", "1899", "1909", "1846", "1910"]);
-  const toks = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter((w) => w && !STOP.has(w));
-  const sameTeam = (x, y) => { const a = toks(x), b = toks(y); return a.some((p) => b.some((q) => p.slice(0, 5) === q.slice(0, 5) && Math.min(p.length, q.length) >= 3)); };
-  const dayOf = (iso) => (iso || "").slice(0, 10);
-  function overlaps(from) {
-    const out = [], seen = new Set();
-    const latest = (ts) => ts.slice().sort((x, y) => ((y.placed || "") > (x.placed || "") ? 1 : -1));
-    const bt = latest(B.tips.filter((t) => inPeriod(t, from)));
-    latest(A.tips.filter((t) => inPeriod(t, from))).forEach((a) => {
-      const k = dayOf(a.kickoff) + toks(a.home).join("") + toks(a.away).join("");
-      if (seen.has(k)) return;   // gleiches Spiel an mehreren Tagen getippt: nur der neueste Tipp
-      seen.add(k);
-      const b = bt.find((t) => dayOf(t.kickoff) === dayOf(a.kickoff) && sameTeam(t.home, a.home) && sameTeam(t.away, a.away));
-      if (b) out.push([a, b]);
-    });
-    return out.sort((x, y) => (y[0].kickoff > x[0].kickoff ? 1 : -1));
-  }
-
-  // ---------- Darstellung ----------
-  function duelRow(label, sub, va, vb, fmt, better = "high") {
-    const ok = va != null && vb != null && !isNaN(va) && !isNaN(vb);
-    const max = ok ? Math.max(Math.abs(va), Math.abs(vb)) || 1 : 1;
-    const w = (v) => (v == null || isNaN(v) ? 0 : Math.max(3, Math.abs(v) / max * 100));
-    const winA = ok && (better === "high" ? va > vb : va < vb), winB = ok && (better === "high" ? vb > va : vb < va);
-    return `<div class="row">
-      <div class="val l ${winA ? "win" : ""} ${va == null ? "dim" : ""}"><b>${fmt(va)}</b><span class="bar"><i style="width:${w(va)}%"></i></span></div>
-      <div class="lbl">${label}${sub ? `<small>${sub}</small>` : ""}</div>
-      <div class="val r ${winB ? "win" : ""} ${vb == null ? "dim" : ""}"><b>${fmt(vb)}</b><span class="bar"><i style="width:${w(vb)}%"></i></span></div></div>`;
-  }
-  function chartSvg(from) {
-    const series = [A, B].map((bot) => {
-      const done = bot.tips.filter((t) => inPeriod(t, from) && (t.status === "won" || t.status === "lost"))
-        .sort((x, y) => (x.kickoff > y.kickoff ? 1 : -1));
-      let w = 0;
-      return done.map((t, i) => { w += t.status === "won"; return [i + 1, w / (i + 1)]; });
-    });
-    const n = Math.max(...series.map((s) => s.length));
-    if (n < 2) return `<div class="empty">Die Kurve erscheint, sobald beide Bots ein paar abgerechnete Tipps haben.</div>`;
-    const W = 600, H = 220, pad = 30;
-    const x = (i) => pad + (i - 1) / Math.max(1, n - 1) * (W - pad - 8), y = (v) => 10 + (1 - v) * (H - 40);
-    const path = (s) => s.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
-    const grid = [0, .25, .5, .75, 1].map((v) => `<line x1="${pad}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pad - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v * 100}%</text>`).join("");
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Trefferquote im Verlauf">${grid}
-      <path d="${path(series[0])}" fill="none" stroke="var(--a)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-      <path d="${path(series[1])}" fill="none" stroke="var(--b)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-      <text x="${W - 8}" y="${H - 6}" text-anchor="end" font-size="11" fill="var(--muted)">abgerechnete Tipps →</text></svg>`;
-  }
   function chCard(bot, s, cls) {
     if (!s) return `<div class="panel ch ${cls}"><div class="top"><h3>${esc(bot.bot.name)}</h3></div><div class="empty">Keine Challenge-Daten.</div></div>`;
     const pos = (v) => Math.max(0, Math.min(100, Math.log(Math.max(v, s.c.start) / s.c.start) / Math.log(s.c.goal / s.c.start) * 100));
@@ -382,80 +314,43 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
         <small>${num(o.stake)} → ${num(o.stake * o.odds)} · Chance ${pct(o.probability)}</small></div>` : `<div class="cur"><small>Gerade keine Wette offen.</small></div>`}
     </div>`;
   }
-  const tipLi = (t) => `<li><span><b>${esc(t.label)}</b><small>${esc(t.home)} – ${esc(t.away)} · ${esc(fDay.format(new Date(t.kickoff)))}</small></span>
-    <span class="r"><span class="st ${t.status}">${STATUS[t.status] || ""}${t.score ? " " + esc(t.score) : ""}</span><br><span class="muted">${num(t.odds)}${t.odds_type === "fair" ? " fair" : ""}</span></span></li>`;
-
+  // Wetten einer Challenge (seit Duell-Start, sonst aktueller Versuch), neueste zuerst
+  function betList(bot) {
+    const c = bot && bot.challenge;
+    if (!c || !c.attempts || !c.attempts.length) return `<li class="muted">Keine Challenge-Daten.</li>`;
+    const all = c.attempts.flatMap((a) => (a.bets || []).map((b) => ({ ...b, n: a.n })));
+    const list = (CFG.started ? all.filter((b) => b.placed >= CFG.started) : c.attempts[c.attempts.length - 1].bets.map((b) => ({ ...b, n: c.attempts.length })))
+      .sort((x, y) => (y.placed > x.placed ? 1 : -1)).slice(0, 25);
+    if (!list.length) return `<li class="muted">${CFG.started ? "Seit dem Start noch keine Wette." : "Noch keine Wette."}</li>`;
+    return list.map((b) => {
+      const what = b.legs.length > 1 ? `${b.legs.length}er-Kombi` : esc(b.legs[0].label);
+      const sub = b.legs.map((l) => `${esc(l.home)} – ${esc(l.away)}${b.legs.length > 1 ? " (" + esc(l.label) + ")" : ""}${l.score ? " " + esc(l.score) : ""}`).join(" + ");
+      const res = b.status === "won" ? `<span class="st won">✓ ${num(b.payout)}</span>` : b.status === "lost" ? `<span class="st lost">✗ 0.00</span>` : b.status === "void" ? `<span class="st void">zurück</span>` : `<span class="st open">läuft</span>`;
+      return `<li><span><b>${what}</b> · ${num(b.odds)}<small>${sub}</small><small>Versuch ${b.n} · ${esc(fDay.format(new Date(b.legs[0].kickoff)))}</small></span><span class="r">${num(b.stake)} →<br>${res}</span></li>`;
+    }).join("");
+  }
   function render() {
     const app = $("#app");
     const nameA = A ? A.bot.name : "GoalOracle", nameB = B ? B.bot.name : "Gegner";
     const cA = conn(A, true), cB = conn(B, !!SRC[1]);
-    const head = `<div class="vs"><div class="side"><div class="name a">${esc(nameA)}</div><div class="who">${A ? esc(A.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(A.updated))) : ""}</div>${connHtml(cA)}</div>
-      <div class="mid">VS</div>
-      <div class="side"><div class="name b">${esc(nameB)}</div><div class="who">${B ? esc(B.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(B.updated))) : ""}</div>${connHtml(cB)}</div></div>`;
+    const side = (bot, name, cls, c) => `<div class="side"><div class="name ${cls}">${esc(name)}</div><div class="who">${bot ? esc(bot.bot.owner || "") + " · Stand " + esc(fStamp.format(new Date(bot.updated))) : ""}</div>${connHtml(c)}</div>`;
+    const head = `<div class="vs">${side(A, nameA, "a", cA)}<div class="mid">VS</div>${side(B, nameB, "b", cB)}</div>`;
     if (!A) { app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>Eigene Daten fehlen</strong>duel.json konnte nicht geladen werden.</div>`; return; }
-    if (!B) {
-      app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>${SRC[1] ? "Daten des Gegners nicht erreichbar" : "Gegner noch nicht verbunden"}</strong>${SRC[1]
-        ? `Unter <code>${esc(SRC[1])}</code> kam keine gültige tippduell-Datei (${esc(errB)}). Die Datei muss öffentlich und ohne Login erreichbar sein.`
-        : "Sobald die URL zu seiner duel.json eingetragen ist, erscheint hier der Vergleich."}</div>
-        <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}` + soloView().replace("<footer>", `<div class="panel connbox"><span><b class="a">${esc(nameA)}</b> ${connHtml(cA)}</span><span><b class="b">${esc(nameB)}</b> ${connHtml(cB)}</span></div><footer>`);
-      return;
-    }
-    const firstOf = (bot) => bot.tips.reduce((m, t) => (!m || (t.placed || t.kickoff) < m ? t.placed || t.kickoff : m), null);
-    const common = [firstOf(A), firstOf(B)].filter(Boolean).sort().pop();
-    const from = period === "duel" && CFG.started ? CFG.started : period === "common" ? common : null;
-    const sa = stats(A, from), sb = stats(B, from), ca = chStats(A), cb = chStats(B);
-    const rows = [
-      duelRow("Trefferquote", `${sa.won}/${sa.done} · ${sb.won}/${sb.done}`, sa.rate, sb.rate, pct),
-      duelRow("Gewinn", "Einheiten, nur echte Quoten", sa.profit, sb.profit, (v) => signed(v)),
-      duelRow("ROI", "pro Einsatz", sa.roi, sb.roi, (v) => (v == null ? "–" : signed(v * 100, 0) + "%")),
-      duelRow("Ø Quote", "der abgerechneten Tipps", sa.avgOdds, sb.avgOdds, (v) => num(v)),
-      duelRow("Alle richtig", "Tage ohne Fehler", sa.perfect, sb.perfect, (v) => (v == null ? "–" : String(v))),
-      duelRow("Tipps", "abgegeben", sa.tips, sb.tips, (v) => String(v ?? "–")),
-    ];
-    if (ca && cb) rows.push(
-      duelRow("Challenge", "Rekord", ca.peak, cb.peak, (v) => num(v, 0)),
-      duelRow("Challenge", "Siege in Folge (Rekord)", ca.bestWins, cb.bestWins, (v) => String(v)));
-    // Punkte: wer führt in wie vielen Kategorien
-    const cmp = [[sa.rate, sb.rate], [sa.profit, sb.profit], [sa.perfect, sb.perfect]].concat(ca && cb ? [[ca.peak, cb.peak]] : []);
-    let pa = 0, pb = 0; cmp.forEach(([x, y]) => { if (x != null && y != null) { if (x > y) pa++; else if (y > x) pb++; } });
-    const ov = overlaps(from);
+    const ca = chStats(A), cb = B ? chStats(B) : null;
     app.innerHTML = head + `
-      <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}
-      <div class="score ${pa > pb ? "lead-a" : pb > pa ? "lead-b" : ""}"><b>${pa}</b><span style="align-self:center">Kategorien</span><b>${pb}</b></div>
-      <div class="chips" role="group" aria-label="Zeitraum">
-        ${CFG.started ? `<button class="chip" data-p="duel" aria-pressed="${period === "duel"}">Seit Duell-Start</button>` : ""}
-        <button class="chip" data-p="common" aria-pressed="${period === "common"}">Seit gemeinsamem Start${common ? " (" + esc(fDate.format(new Date(common))) + ")" : ""}</button>
-        <button class="chip" data-p="all" aria-pressed="${period === "all"}">Alles</button></div>
-      <h2 class="sec">Tipps</h2>
-      <div class="panel rows">${rows.join("")}</div>
-      <p class="note">Gezählt werden nur live abgegebene Tipps (keine nachträglich berechneten). Gewinn und ROI: 1 Einheit Einsatz pro Tipp, nur Tipps mit echter Buchmacher-Quote. ◆ = vorne.</p>
-      <h2 class="sec">Trefferquote im Verlauf</h2>
-      <div class="panel"><div class="legend"><span><i style="background:var(--a)"></i>${esc(nameA)}</span><span><i style="background:var(--b)"></i>${esc(nameB)}</span></div><div style="padding:6px 8px 10px">${chartSvg(from)}</div></div>
-      <h2 class="sec">Challenge (gesamt)</h2>
-      <div class="two">${chCard(A, ca, "")}${chCard(B, cb, "bside")}</div>
-      <h2 class="sec">Gleiche Spiele</h2>
-      <div class="panel">${ov.length ? `<ul class="same">${ov.slice(0, 40).map(([a, b]) => `<li><div class="m">${esc(a.home)} – ${esc(a.away)} · ${esc(fDay.format(new Date(a.kickoff)))}${a.score ? " · " + esc(a.score) : ""}</div>
-        <div class="picks"><span><span class="a" style="font-weight:600">${esc(a.label)}</span> <span class="st ${a.status}">${STATUS[a.status]}</span></span><span><span class="st ${b.status}">${STATUS[b.status]}</span> <span class="b" style="font-weight:600">${esc(b.label)}</span></span></div></li>`).join("")}</ul>`
-        : `<div class="empty">Noch kein Spiel, das beide getippt haben.</div>`}</div>
-      <h2 class="sec">Letzte Tipps</h2>
+      <h2 class="sec">Challenge 100 → 100'000</h2>${raceHtml()}${ctlHtml()}
+      <h2 class="sec">${CFG.started ? "Wetten seit dem Start" : "Aktueller Versuch"}</h2>
       <div class="chips mob-tabs" role="group"><button class="chip" data-s="a" aria-pressed="${mobSide === "a"}">${esc(nameA)}</button><button class="chip" data-s="b" aria-pressed="${mobSide === "b"}">${esc(nameB)}</button></div>
       <div class="lists one-${mobSide}" style="margin-top:10px">
-        <div class="panel la"><div class="head">${esc(nameA)}</div><ul class="tips">${recent(A, from)}</ul></div>
-        <div class="panel lb"><div class="head">${esc(nameB)}</div><ul class="tips">${recent(B, from)}</ul></div></div>
+        <div class="panel la"><div class="head">${esc(nameA)}</div><ul class="tips">${betList(A)}</ul></div>
+        <div class="panel lb"><div class="head">${esc(nameB)}</div><ul class="tips">${B ? betList(B) : `<li class="muted">${SRC[1] ? "Daten nicht erreichbar." : "Kein Gegner eingetragen."}</li>`}</ul></div></div>
+      <h2 class="sec">Challenge gesamt</h2>
+      <div class="two">${chCard(A, ca, "")}${B ? chCard(B, cb, "bside") : `<div class="panel ch bside"><div class="top"><h3>${esc(nameB)}</h3></div><div class="empty">Noch keine Daten.</div></div>`}</div>
+      <p class="note">Challenge-Regeln: Start mit 100 CHF, immer nur eine Wette offen, der ganze Betrag wird weiter eingesetzt, jede Wette etwa Quote 2. Eine verlorene Wette heisst: zurück auf 100. «Challenge gesamt» zählt alle Versuche seit Beginn, das Duell oben nur ab dem Start-Klick.</p>
       <div class="panel connbox"><span><b class="a">${esc(nameA)}</b> ${connHtml(cA)}</span><span><b class="b">${esc(nameB)}</b> ${connHtml(cB)}</span></div>
-      <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1 · Daten: <a href="${esc(SRC[0])}" style="color:inherit">${esc(nameA)}</a> · <a href="${esc(SRC[1])}" style="color:inherit">${esc(nameB)}</a></footer>`;
-  }
-  const recent = (bot, from) => bot.tips.filter((t) => inPeriod(t, from)).sort((x, y) => (y.kickoff > x.kickoff ? 1 : -1)).slice(0, 15).map(tipLi).join("") || `<li class="muted">Noch keine Tipps.</li>`;
-  function soloView() {
-    const s = stats(A, null), c = chStats(A);
-    return `<h2 class="sec">${esc(A.bot.name)} bisher</h2>
-      <div class="panel rows">${duelRow("Trefferquote", `${s.won}/${s.done}`, s.rate, null, pct)}${duelRow("Gewinn", "Einheiten, nur echte Quoten", s.profit, null, (v) => signed(v))}${duelRow("Tipps", "abgegeben", s.tips, null, (v) => String(v ?? "–"))}</div>
-      <h2 class="sec">Challenge</h2><div class="two">${chCard(A, c, "")}</div>
-      <h2 class="sec">Letzte Tipps</h2><div class="panel"><ul class="tips">${recent(A, null)}</ul></div>
       <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1</footer>`;
   }
   document.addEventListener("click", (e) => {
-    const p = e.target.closest("[data-p]"); if (p) { period = p.dataset.p; render(); return; }
     const s = e.target.closest("[data-s]"); if (s) { mobSide = s.dataset.s; render(); return; }
     const c = e.target.closest("[data-act]"); if (!c || busy) return;
     e.preventDefault();
@@ -472,7 +367,6 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   async function boot() {
     CFG = await fetch("duel-config.json?t=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
     SRC[1] = qs.get("b") || CFG.partner_url || PARTNER_URL;
-    if (CFG.started && period === "common") period = "duel";
     const [a, b] = await Promise.all([load(SRC[0]).catch(() => null), SRC[1] ? load(SRC[1]).catch((e) => { errB = e.message; return null; }) : Promise.resolve(null)]);
     A = a; B = b; render();
   }

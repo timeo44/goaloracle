@@ -19,7 +19,9 @@ Vergleichsseite: https://timeo44.github.io/goaloracle/vergleich.html
 }
 ```
 
-### Tipp (die besten Tipps des Tages, max. 5 pro Tag)
+Die Vergleichsseite vergleicht **nur die Challenge**. `tips` ist optional und darf `[]` sein.
+
+### Tipp (optional: die besten Tipps des Tages, max. 5 pro Tag)
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
