@@ -4,8 +4,8 @@
   darf am selben Tag die nächste folgen.
 - Gewinn wird komplett weiter eingesetzt (100 → 140 → 196 …).
 - Eine verlorene Wette beendet den Versuch. Der nächste Versuch startet wieder mit 100 CHF.
-- Gewählt wird die sicherste verfügbare Wette: Einzeltipp oder 2er-Kombi mit echter
-  Marktquote, Gesamtquote mindestens 1.25, höchste Chance zuerst.
+- Jede Wette soll den Betrag etwa verdoppeln: Gesamtquote 1.85 bis 2.30. Gewählt wird
+  die sicherste solche Wette (höchste Chance): Einzeltipp, 2er- oder 3er-Kombi mit echter Marktquote.
 """
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from sources.espn import DEAD, FINAL_90, parse_date
 
 START = 100.0
 GOAL = 100_000.0
-MIN_ODDS = 1.25          # darunter dauert es zu lange (bei 1.25 rund 31 Siege bis zum Ziel)
-MAX_ODDS = 1.60          # darüber ist es nicht mehr «höchstwahrscheinlich»
-MIN_P = 0.62
+MIN_ODDS = 1.85          # etwa verdoppeln: rund 10 Siege bis zum Ziel
+MAX_ODDS = 2.30
+MIN_P = 0.40
 HOURS = 30               # nur Spiele, die bald abgerechnet sind
 
 
@@ -50,10 +50,11 @@ def pick(upcoming, now) -> dict | None:
     """Sicherste Wette: höchste Chance bei Gesamtquote 1.25–1.60."""
     legs = _legs(upcoming, now)
     cands = [[l] for l in legs if MIN_ODDS <= l["odds"] <= MAX_ODDS]
-    strong = sorted([l for l in legs if l["p"] >= 0.78], key=lambda l: -l["p"])[:10]
-    for a, b in combinations(strong, 2):
-        if a["id"] != b["id"] and MIN_ODDS <= a["odds"] * b["odds"] <= MAX_ODDS:
-            cands.append([a, b])
+    strong = sorted([l for l in legs if l["p"] >= 0.60], key=lambda l: -l["p"])[:14]
+    for n in (2, 3):
+        for c in combinations(strong, n):
+            if len({l["id"] for l in c}) == n and MIN_ODDS <= math.prod(l["odds"] for l in c) <= MAX_ODDS:
+                cands.append(list(c))
     best = None
     for c in cands:
         p = math.prod(l["p"] for l in c)
