@@ -547,7 +547,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   <section class="view" id="view-tipps" hidden>
     <div class="tipbar">
-      <div class="seg" id="tp-kind" style="max-width:360px"><button type="button" data-v="single" aria-pressed="true">Einzelwetten</button><button type="button" data-v="combo" aria-pressed="false">Kombis</button></div>
+      <div class="seg" id="tp-kind" style="max-width:420px"><button type="button" data-v="single" aria-pressed="true">Einzelwetten</button><button type="button" data-v="combo" aria-pressed="false">Kombis</button><button type="button" data-v="testlauf" aria-pressed="false">Testlauf</button></div>
       <div class="chips" id="tp-when" role="group" aria-label="Zeitraum" style="margin:0">
         <button type="button" class="chip" data-v="24" aria-pressed="false">24 Stunden</button>
         <button type="button" class="chip" data-v="48" aria-pressed="true">48 Stunden</button>
@@ -580,7 +580,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-testlauf" hidden>
-    <button class="back" type="button" id="tl-back">← Einstellungen</button>
+    <div class="tipbar" style="margin-bottom:14px"><div class="seg" id="tl-seg" style="max-width:420px"><button type="button" data-v="single" aria-pressed="false">Einzelwetten</button><button type="button" data-v="combo" aria-pressed="false">Kombis</button><button type="button" data-v="testlauf" aria-pressed="true">Testlauf</button></div></div>
     <div class="chips" role="group" aria-label="Testlauf-Art">
       <button class="chip" type="button" id="tl-sim" aria-pressed="true">Rückblick simulieren</button>
       <button class="chip" type="button" id="tl-paper" aria-pressed="false">Spielgeld-Konto</button>
@@ -643,11 +643,6 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   </section>
 
   <section class="view" id="view-einstellungen" hidden>
-    <a class="panel tl-link" href="#testlauf">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
-      <span><b>Testlauf</b><small>Rückblick simulieren mit Budget und Risiko, oder das Spielgeld-Konto ansehen</small></span>
-      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
-    </a>
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-h"><h3>Telegram</h3><span class="muted" style="font-size:12.5px" id="tg-where"></span></div>
       <div class="panel-b send-box" data-send-box></div>
@@ -923,13 +918,13 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     renderVisible();
     // Zurück zu einer Liste: alte Scroll-Position wiederherstellen
     if (prev && prev !== v && (prev === "spiel" || prev === "team") && scrollMem[v] != null) requestAnimationFrame(() => window.scrollTo(0, scrollMem[v]));
-    const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v;
+    const tabV = v === "spiel" ? "spiele" : v === "team" ? "ranking" : v === "testlauf" ? "tipps" : v;
     $$(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === tabV)));
-    $("#gear").setAttribute("aria-pressed", String(v === "einstellungen" || v === "testlauf"));
+    $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
     if (v === "team") renderTeam(h.slice(5));
     if (v === "testlauf") ensureSim();
-    if (v !== "spiel" && v !== "team" && v !== "einstellungen" && v !== "testlauf") lastList = v;
+    if (v !== "spiel" && v !== "team" && v !== "einstellungen") lastList = v;
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => {
     if (location.hash.slice(1) === b.dataset.view) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
@@ -952,7 +947,6 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   // Nach dem Neuladen die Adresse bereinigen
   if (/[?&]r=\d+/.test(location.search)) window.history.replaceState(null, "", location.pathname + location.hash);
   $("#gear").addEventListener("click", () => { location.hash = location.hash === "#einstellungen" ? lastList : "einstellungen"; window.scrollTo(0, 0); });
-  $("#tl-back").addEventListener("click", () => { location.hash = "einstellungen"; window.scrollTo(0, 0); });
   window.addEventListener("hashchange", () => { route(); });
 
   // ---------- Spiele ----------
@@ -1084,7 +1078,8 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#tp-legs").hidden = tp.kind !== "combo";
   }
   const tpSet = (k, v) => { tp[k] = v; store.set("go-tp", tp); renderTipps(); };
-  $("#tp-kind").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) tpSet("kind", b.dataset.v); });
+  $("#tp-kind").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.v === "testlauf") { location.hash = "testlauf"; return; } tpSet("kind", b.dataset.v); });
+  $("#tl-seg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || b.dataset.v === "testlauf") return; tpSet("kind", b.dataset.v); location.hash = "tipps"; });
   $("#tp-when").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("hours", +b.dataset.v); });
   $("#tp-out").addEventListener("click", (e) => { if (e.target.closest("#tp-week")) tpSet("hours", 168); });
   $("#tp-legs").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) tpSet("legs", +b.dataset.v); });
