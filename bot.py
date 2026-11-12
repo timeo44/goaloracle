@@ -21,6 +21,7 @@ import config as C
 import engine as E
 import botd as B
 import challenge as CH
+import duel as DU
 from sources import telegram as TG
 import tuning as T
 from predictor import Params, Predictor
@@ -325,6 +326,7 @@ def main():
     write_json(WEB / "data.json", data)
     write_json(WEB / "paper.json", paper)
     write_json(WEB / "challenge.json", chal)
+    write_json(WEB / "duel.json", DU.export(botd_state, chal, label, os.getenv("SITE_URL", ""), now))
     write_json(WEB / "botd.json", botd_state)
     write_json(WEB / "history.json", {"generated": now.isoformat(), "history": history})
     if not args.skip_sim:
