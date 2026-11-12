@@ -582,10 +582,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   <section class="view" id="view-testlauf" hidden>
     <div class="tipbar" style="margin-bottom:14px"><div class="seg" id="tl-seg" style="max-width:420px"><button type="button" data-v="single" aria-pressed="false">Einzelwetten</button><button type="button" data-v="combo" aria-pressed="false">Kombis</button><button type="button" data-v="testlauf" aria-pressed="true">Testlauf</button></div></div>
     <div class="chips" role="group" aria-label="Testlauf-Art">
-      <button class="chip" type="button" id="tl-sim" aria-pressed="true">Rückblick simulieren</button>
-      <button class="chip" type="button" id="tl-paper" aria-pressed="false">Spielgeld-Konto</button>
+      <button class="chip" type="button" id="tl-paper" aria-pressed="true">Spielgeld-Konto</button>
+      <button class="chip" type="button" id="tl-sim" aria-pressed="false">Rückblick simulieren</button>
     </div>
-    <div id="sim-pane" class="two" style="margin-top:12px">
+    <div id="sim-pane" class="two" style="margin-top:12px" hidden>
       <div class="panel">
         <div class="panel-h"><h3>Einstellungen</h3><span class="muted" style="font-size:12.5px" id="sim-range"></span></div>
         <form class="sim panel-b" id="sim-form">
@@ -620,7 +620,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
       </div>
       <div id="sim-out" style="display:grid;gap:14px;min-width:0"></div>
     </div>
-    <div id="paper-pane" hidden style="margin-top:12px;display:grid;gap:14px"></div>
+    <div id="paper-pane" style="margin-top:12px;display:grid;gap:14px"></div>
   </section>
 
   <section class="view" id="view-ranking" hidden>
@@ -822,7 +822,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   let settings = null;
   let compFilter = store.get("go-comp") || "all";
   let rankComp = "europa";
-  let tlMode = "sim";
+  let tlMode = "paper";
 
   function defaults() {
     const g = {}; GROUPS.forEach(([k, , , on]) => (g[k] = on));
@@ -923,7 +923,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     $("#gear").setAttribute("aria-pressed", String(v === "einstellungen"));
     if (v === "spiel") renderDetail(h.slice(6));
     if (v === "team") renderTeam(h.slice(5));
-    if (v === "testlauf") ensureSim();
+    if (v === "testlauf") { ensureSim(); if (tlMode === "paper") renderPaper(); }
     if (v !== "spiel" && v !== "team" && v !== "einstellungen") lastList = v;
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => {
@@ -1812,7 +1812,6 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   }
   $("#tl-sim").addEventListener("click", () => { tlMode = "sim"; $("#sim-pane").hidden = false; $("#paper-pane").hidden = true; $("#tl-sim").setAttribute("aria-pressed", "true"); $("#tl-paper").setAttribute("aria-pressed", "false"); });
   $("#tl-paper").addEventListener("click", () => { tlMode = "paper"; $("#sim-pane").hidden = true; $("#paper-pane").hidden = false; $("#tl-paper").setAttribute("aria-pressed", "true"); $("#tl-sim").setAttribute("aria-pressed", "false"); renderPaper(); });
-  $("#tl-sim").setAttribute("aria-pressed", "true");
 
   // ---------- Ranking ----------
   function renderRanking() {
