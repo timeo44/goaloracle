@@ -1,5 +1,5 @@
 name: GoalOracle
-run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || (inputs.send_only && 'Top 5 an Telegram' || 'Manueller Lauf') }}
+run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || (inputs.send_only && 'Top 5 an Telegram' || (inputs.job == 'morning' && 'Zeitplan 10 Uhr (cron-job.org)' || (inputs.job == 'refresh' && 'Aktualisierung (cron-job.org)' || 'Manueller Lauf'))) }}
 
 on:
   schedule:
@@ -25,6 +25,10 @@ on:
         description: "Modell-Einstellungen neu optimieren (dauert 5–10 Minuten)"
         type: boolean
         default: false
+      job:
+        description: "Für externe Zeitpläne: morning = 10-Uhr-Nachricht, refresh = Aktualisierung"
+        type: string
+        default: ""
       send_only:
         description: "Nur die heutigen Top 5 an Telegram senden (ohne Rechnen)"
         type: boolean
@@ -56,14 +60,16 @@ jobs:
             CRON="${{ github.event.schedule }}"
             if [ "$CRON" = "15 2 * * 1" ]; then ARGS="--retune"
             elif [ "$CRON" = "5 */2 * * *" ]; then ARGS=""
-            elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds"
-            elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds"
+            elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"
+            elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"
             else RUN=false; fi
           else
             if [ "${{ inputs.notify }}" = "true" ]; then ARGS="$ARGS --notify"; fi
             if [ "${{ inputs.refresh_odds }}" = "true" ]; then ARGS="$ARGS --refresh-odds"; fi
             if [ "${{ inputs.retune }}" = "true" ]; then ARGS="$ARGS --retune"; fi
             if [ "${{ inputs.send_only }}" = "true" ]; then ARGS="--send-only"; fi
+            if [ "${{ inputs.job }}" = "morning" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"; fi
+            if [ "${{ inputs.job }}" = "refresh" ]; then ARGS=""; fi
           fi
           SEND=false; case "$ARGS" in *--send-only*) SEND=true;; esac
           echo "send=$SEND" >> "$GITHUB_OUTPUT"

@@ -371,7 +371,8 @@ def run_paper(state: dict | None, upcoming: list[dict], events_by_id: dict, now:
     cands.sort(key=lambda x: x[0], reverse=True)
     cands = [c[1:] for c in cands]
     used = set()
-    n = 0
+    # Tageslimit über alle Läufe des Tages (es wird alle 2 Stunden gerechnet)
+    n = sum(1 for b in state["bets"] if b.get("placed", "")[:10] == now.date().isoformat())
     for ev, u, k, p, eff in cands:
         if u["id"] in used or n >= cfg["max_bets_per_day"]:
             continue

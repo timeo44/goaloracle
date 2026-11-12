@@ -28,6 +28,7 @@ from sources import crests, espn, fdcouk, oddsapi
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 TZ = ZoneInfo("Europe/Zurich")
+esc = html.escape
 WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
 LABEL = {"1": "Sieg {h}", "X": "Unentschieden", "2": "Sieg {a}", "1X": "{h} oder X", "X2": "X oder {a}",
@@ -114,6 +115,24 @@ def wait_until(hhmm: str, max_minutes: int = 45):
         time.sleep(wait)
 
 
+def paper_text(new_bets: list[dict], paper: dict, site: str) -> str:
+    """Nachricht, wenn das Spielgeld-Konto (Testlauf) neue Wetten setzt."""
+    n = len(new_bets)
+    lines = [f"🎯 <b>Testlauf</b> · {'neue Wette' if n == 1 else f'{n} neue Wetten'}"]
+    for b in new_bets:
+        ko = E.parse_date(b["kickoff"]).astimezone(TZ)
+        h, a = b["match"].split(" – ", 1) if " – " in b["match"] else (b["match"], "")
+        val = f" · Value {b['ev'] * 100:+.0f}%" if b.get("ev") is not None and b["ev"] >= 0.03 else ""
+        lines.append(f"<b>{esc(label(b['key'], h, a))}</b>\n{esc(b['match'])} · {WD[ko.weekday()]} {ko:%H:%M}\n"
+                     f"Einsatz {b['stake']:.2f} CHF · Quote {b['odds']:.2f} · Chance {b['p'] * 100:.0f}%{val}\n"
+                     f"möglicher Gewinn {b['stake'] * b['odds']:.2f} CHF")
+    open_st = sum(b["stake"] for b in paper["bets"] if b["status"] == "open")
+    lines.append(f"Konto: {paper['balance']:.2f} CHF frei · {open_st:.2f} CHF im Spiel")
+    if site:
+        lines.append(f'<a href="{site}#testlauf">Testlauf ansehen</a>')
+    return "\n\n".join(lines)
+
+
 def send_only(now) -> int:
     """Heutige Top 5 (so wie sie um 10 Uhr festgelegt wurden) nochmals an Telegram schicken."""
     state = load_json(WEB / "botd.json", None) or {"days": []}
@@ -147,12 +166,21 @@ def main():
     ap.add_argument("--retune", action="store_true", help="Modell-Einstellungen neu optimieren (dauert einige Minuten)")
     ap.add_argument("--dry-run", action="store_true", help="Telegram-Text nur anzeigen")
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
+    ap.add_argument("--once", action="store_true",
+                    help="Morgen-Nachricht nur einmal pro Tag (falls schon gesendet: keine Nachricht, keine neuen Quoten)")
     ap.add_argument("--send-only", action="store_true", help="Nur die heutigen Top 5 an Telegram senden, nichts rechnen")
     args = ap.parse_args()
 
     now = datetime.now(timezone.utc)
     if args.send_only:
         return send_only(now)
+    if args.once:
+        prev = load_json(WEB / "botd.json", None) or {"days": []}
+        today = B.local_day(now)
+        if any(d.get("sent") for d in prev.get("days", []) if d["day"] == today and not d.get("retro")):
+            print("Morgen-Nachricht wurde heute schon gesendet: nur aktualisieren.")
+            args.notify = args.refresh_odds = False
+            args.send_at = None
     season = now.year if now.month >= 7 else now.year - 1
     slugs = list(C.DISPLAY) + C.TRAIN_CLUB_LEAGUES + C.TRAIN_NATION
     events = espn.load(slugs, C.HISTORY_START, now)
@@ -209,6 +237,7 @@ def main():
                                    extra_ids=form_ids, extra_since=now - timedelta(days=400))
     history = E.update_history(prev_hist, upcoming, by_id, now)
     paper = E.run_paper(load_json(WEB / "paper.json", None), upcoming, by_id, now)
+    new_paper = [b for b in paper["bets"] if b.get("placed") == now.isoformat()]
     # Bets des Tages: um 10 Uhr (bzw. beim ersten Lauf danach) festlegen, danach nur auswerten
     local_now = now.astimezone(TZ)
     create = args.notify or args.dry_run or local_now.hour >= 10
@@ -263,6 +292,17 @@ def main():
     token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
     tg_file = ROOT / "cache" / "telegram.json"
     tg = TG.find_group(token, owner, tg_file) if token and owner and not args.dry_run else {}
+    if new_paper:
+        ptext = paper_text(new_paper, paper, os.getenv("SITE_URL", ""))
+        if args.dry_run or not token or not owner:
+            print(ptext)
+        else:
+            try:
+                TG.send(token, tg.get("chat_id") or owner, ptext, tg)
+                TG.save(tg_file, tg)
+                print(f"Telegram: Testlauf, {len(new_paper)} neue Wetten gemeldet.")
+            except RuntimeError as err:
+                print(f"Testlauf-Nachricht fehlgeschlagen: {err}")
     if not args.notify and not args.dry_run:
         return
     site = os.getenv("SITE_URL", "")
@@ -274,16 +314,21 @@ def main():
         return
     if args.send_at:
         wait_until(args.send_at)
+    sent = False
     if tg.get("chat_id"):
         try:
             TG.send(token, tg["chat_id"], text, tg)
             TG.save(tg_file, tg)
             print(f"Telegram gesendet an Gruppe «{tg.get('title', '')}».")
-            return
+            sent = True
         except RuntimeError as err:
             print(f"Gruppe nicht erreichbar ({err}), sende privat.")
-    TG.send(token, owner, text)
-    print("Telegram gesendet (privat).")
+    if not sent:
+        TG.send(token, owner, text)
+        print("Telegram gesendet (privat).")
+    if day is not None:   # merken, damit spätere (verspätete) Läufe nicht nochmals senden
+        day["sent"] = datetime.now(timezone.utc).isoformat()
+        write_json(WEB / "botd.json", botd_state)
 
 
 if __name__ == "__main__":
