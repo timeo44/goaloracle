@@ -71,7 +71,9 @@ def export(botd_state: dict, chal: dict | None, label, site: str, now) -> dict:
                     "legs": [{"kickoff": l["kickoff"], "competition": comp_name(l["comp"]),
                               "home": l["home"], "away": l["away"], "pick": pick_code(l["key"]),
                               "label": label(l["key"], l["home"], l["away"]), "odds": l["odds"],
-                              "status": l["status"], "score": _score(l.get("result"))} for l in bt["legs"]],
+                              "status": l["status"], "score": _score(l.get("result")),
+                              "home_logo": l.get("home_logo"), "away_logo": l.get("away_logo"),
+                              "espn": {"league": l["comp"], "event": l["id"]}} for l in bt["legs"]],
                 })
             attempts.append({"n": att["n"], "started": att["started"], "ended": att["ended"],
                              "status": att["result"], "bank": att["bank"], "peak": att["peak"], "bets": bets})

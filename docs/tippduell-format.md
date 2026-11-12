@@ -72,6 +72,9 @@ Alles andere: `OTHER` (dann zählt nur `label`).
   ]
 }
 ```
+Optional pro Leg: `home_logo`, `away_logo` (Bild-URLs) und `espn: {"league": "eng.1", "event": "740123"}`
+für exakte Live-Spielstände. Fehlt das, sucht die Vergleichsseite das Spiel über Datum, Wettbewerb und Teamnamen.
+
 Einzelwette = 1 Leg, Kombi = mehrere Legs. `bank` = aktueller Betrag des Versuchs,
 `peak` = Höchststand. Ein verlorener Versuch hat `status: "lost"` und `bank: 0`.
 

@@ -42,6 +42,7 @@ def _legs(upcoming, now):
                 continue
             out.append({"id": u["id"], "kickoff": u["kickoff"], "comp": u["comp"],
                         "home": u["home"]["name"], "away": u["away"]["name"],
+                        "home_logo": u["home"].get("logo") or None, "away_logo": u["away"].get("logo") or None,
                         "key": k, "p": round(p, 3), "odds": round(o, 2)})
     return out
 
