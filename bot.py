@@ -176,6 +176,27 @@ def paper_text(new_bets: list[dict], paper: dict, site: str) -> str:
     return "\n\n".join(lines)
 
 
+def duel_config(now) -> int:
+    """Tippduell: Startzeit und Gegner-URL in web/duel-config.json festhalten."""
+    action = (os.getenv("DUEL_ACTION") or "").strip()
+    partner = (os.getenv("DUEL_PARTNER") or "").strip()
+    f = WEB / "duel-config.json"
+    cfg = load_json(f, None) or {}
+    if partner:
+        if not partner.startswith("https://") or len(partner) > 400 or any(c in partner for c in " <>\"'"):
+            print("Ungültige URL für den Gegner.")
+            return 1
+        cfg["partner_url"] = partner
+    if action == "start":
+        cfg["started"] = now.isoformat()
+    elif action == "stop":
+        cfg.pop("started", None)
+    cfg["updated"] = now.isoformat()
+    write_json(f, cfg)
+    print(f"Tippduell: {cfg}")
+    return 0
+
+
 def send_only(now) -> int:
     """Heutige Top 5 (so wie sie um 10 Uhr festgelegt wurden) nochmals an Telegram schicken."""
     state = load_json(WEB / "botd.json", None) or {"days": []}
@@ -211,12 +232,15 @@ def main():
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
     ap.add_argument("--once", action="store_true",
                     help="Morgen-Nachricht nur einmal pro Tag (falls schon gesendet: keine Nachricht, keine neuen Quoten)")
+    ap.add_argument("--duel", action="store_true", help="Tippduell starten/stoppen/Gegner setzen (DUEL_ACTION, DUEL_PARTNER)")
     ap.add_argument("--send-only", action="store_true", help="Nur die heutigen Top 5 an Telegram senden, nichts rechnen")
     args = ap.parse_args()
 
     now = datetime.now(timezone.utc)
     if args.send_only:
         return send_only(now)
+    if args.duel:
+        return duel_config(now)
     if args.once:
         prev = load_json(WEB / "botd.json", None) or {"days": []}
         today = B.local_day(now)

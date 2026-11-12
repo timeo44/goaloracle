@@ -43,7 +43,7 @@ h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter
 .vs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 12px; }
 .vs .side { min-width: 0; }
 .vs .side:last-child { text-align: right; }
-.vs .name { font: 700 clamp(24px, 6.4vw, 52px)/.95 var(--font-display); text-transform: uppercase; overflow-wrap: anywhere; }
+.vs .name { font: 700 clamp(22px, 5.6vw, 52px)/.95 var(--font-display); text-transform: uppercase; overflow-wrap: anywhere; }
 .vs .who { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
 .vs .mid { font: 700 20px/1 var(--font-display); color: var(--muted); padding-bottom: 8px; }
 .score { display: flex; justify-content: center; gap: 10px; margin: 18px 0 4px; font: 700 15px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -118,6 +118,35 @@ svg.chart { width: 100%; height: 220px; display: block; }
 .empty { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px; }
 .empty strong { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; }
+/* Duell-Rennen */
+.race { padding: 16px; }
+.race .lead { font: 700 22px/1.15 var(--font-display); text-transform: uppercase; text-align: center; margin: 2px 0 14px; }
+.race .since { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: -10px; margin-bottom: 14px; }
+.lane { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: end; padding: 10px 0; border-top: 1px solid var(--line); }
+.lane:first-of-type { border-top: 0; }
+.lane .nm { font: 700 18px/1 var(--font-display); text-transform: uppercase; }
+.lane .nm small { font: 500 12.5px var(--font-body); text-transform: none; color: var(--muted); margin-left: 6px; }
+.lane .amt { font: 700 34px/1 var(--font-display); font-variant-numeric: tabular-nums; text-align: right; }
+.lane .amt small { font-size: 15px; color: var(--muted); margin-left: 2px; }
+.lane .road { grid-column: 1 / -1; position: relative; height: 26px; margin-top: 6px; }
+.lane .road::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 4px; border-radius: 2px; background: var(--sunken); }
+.lane .road .fill { position: absolute; left: 0; top: 11px; height: 4px; border-radius: 2px; }
+.lane .road .car { position: absolute; top: 4px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); transition: left .6s; }
+.lane .road .pk { position: absolute; top: 6px; width: 2px; height: 14px; background: var(--muted); opacity: .6; }
+.lane.la .fill, .lane.la .car { background: var(--a); } .lane.lb .fill, .lane.lb .car { background: var(--b); }
+.lane .meta { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ctl { margin-top: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.ctl > * { min-width: 0; }
+.ctl .line .btn { flex: none; padding: 12px 12px; }
+.ctl label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ctl .line { display: flex; gap: 8px; }
+.ctl input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--ink); padding: 10px 12px; font: 14px var(--font-body); }
+.btn { appearance: none; border: 0; border-radius: var(--radius); background: var(--a); color: var(--surface); font: 700 16px/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; padding: 12px 16px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.warn { background: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+.ctl .msg { font-size: 13px; color: var(--muted); }
 footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
 </style>
 </head>
@@ -131,6 +160,9 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
   // ------------------------------------------------------------------
   const qs = new URLSearchParams(location.search);
   const SRC = [qs.get("a") || "duel.json", qs.get("b") || PARTNER_URL];
+  let CFG = {};
+  const REPO = { owner: location.hostname.split(".")[0], repo: location.pathname.split("/").filter(Boolean)[0] || "" };
+  const token = () => { try { return localStorage.getItem("go-gh-token") || ""; } catch (e) { return ""; } };
 
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -188,6 +220,91 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
       goals: c.attempts.filter((a) => a.status === "won").length,
       open: (cur.bets || []).find((b) => b.status === "open"),
     };
+  }
+
+  // ---------- Duell-Rennen ----------
+  // Ab dem Start-Klick fangen beide virtuell bei 100 an. Gezählt werden nur Challenge-Wetten,
+  // die nach dem Start gesetzt wurden: Gewinn = Betrag × Quote, Verlust = zurück auf 100.
+  function race(bot, started) {
+    const c = bot.challenge;
+    const start = c ? c.start || 100 : 100, goal = c ? c.goal || 100000 : 100000;
+    const bets = c ? c.attempts.flatMap((a) => a.bets || []).filter((b) => b.placed >= started)
+      .sort((x, y) => (x.placed > y.placed ? 1 : -1)) : [];
+    let bank = start, peak = start, attempts = 1, streak = 0, best = 0, open = null;
+    const pts = [[new Date(started).getTime(), start]];
+    for (const b of bets) {
+      const t = Math.min(Date.now() - 1, Math.max(...b.legs.map((l) => new Date(l.kickoff).getTime())) + 2 * 3600e3);
+      if (b.status === "open") { open = b; continue; }
+      if (b.status === "won") { bank = bank * b.odds; streak++; best = Math.max(best, streak); peak = Math.max(peak, bank); }
+      else if (b.status === "lost") { pts.push([t, 0]); bank = start; attempts++; streak = 0; }
+      pts.push([t, bank]);
+    }
+    pts.push([Date.now(), bank]);
+    return { bank, peak, attempts, streak, best, open, pts, start, goal, n: bets.length, has: !!c };
+  }
+  const pos = (r, v) => Math.max(0, Math.min(100, Math.log(Math.max(v, r.start) / r.start) / Math.log(r.goal / r.start) * 100));
+  function lane(bot, r, cls) {
+    const o = r.open;
+    return `<div class="lane ${cls}"><div class="nm">${esc(bot.bot.name)}<small>Versuch ${r.attempts}</small></div><div class="amt">${num(r.bank)}<small>CHF</small></div>
+      <div class="road"><span class="fill" style="width:${pos(r, r.bank)}%"></span>${r.peak > r.bank ? `<span class="pk" style="left:${pos(r, r.peak)}%" title="Höchststand"></span>` : ""}<span class="car" style="left:${pos(r, r.bank)}%"></span></div>
+      <div class="meta"><span>${r.streak} ${r.streak === 1 ? "Sieg" : "Siege"} in Folge · Hoch ${num(r.peak, 0)}</span><span>${o ? `läuft: ${o.legs.length > 1 ? o.legs.length + "er-Kombi" : esc(o.legs[0].label)} · ${num(o.odds)}` : r.has ? "keine Wette offen" : "keine Challenge-Daten"}</span></div></div>`;
+  }
+  function raceChart(ra, rb) {
+    [ra, rb].forEach((r) => r.pts.sort((p, q) => p[0] - q[0]));
+    const all = ra.pts.concat(rb.pts);
+    const t0 = Math.min(...all.map((p) => p[0])), t1 = Math.max(...all.map((p) => p[0]));
+    if (t1 - t0 < 3600e3 || (ra.pts.length < 3 && rb.pts.length < 3)) return "";
+    const W = 600, H = 180, pad = 34;
+    const x = (t) => pad + (t - t0) / (t1 - t0) * (W - pad - 8);
+    const top = Math.min(ra.goal, Math.max(1000, ra.peak * 2, rb.peak * 2)), bot = 70;
+    const y = (v) => { const p = Math.log(Math.max(v, bot) / bot) / Math.log(top / bot); return 8 + (1 - p) * (H - 30); };
+    const step = (pts) => pts.map((p, i) => (i ? `H${x(p[0]).toFixed(1)}V${y(p[1]).toFixed(1)}` : `M${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`)).join("");
+    const grid = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000].filter((v) => v <= top).map((v) => `<line x1="${pad}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pad - 5}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v >= 1000 ? v / 1000 + "k" : v}</text>`).join("");
+    return `<svg class="chart" style="height:180px;margin-top:12px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Verlauf des Duells">${grid}
+      <path d="${step(ra.pts)}" fill="none" stroke="var(--a)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+      <path d="${step(rb.pts)}" fill="none" stroke="var(--b)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-dasharray="6 3"/></svg>`;
+  }
+  function raceHtml() {
+    const started = CFG.started;
+    if (!started) return `<div class="panel race"><div class="lead">Duell noch nicht gestartet</div>
+      <p class="since" style="margin:0">Nach dem Start fangen beide bei 100 CHF an. Wer verliert, beginnt wieder bei 100. Hier siehst du jederzeit, wer weiter oben ist.</p></div>`;
+    const ra = race(A, started), rb = B ? race(B, started) : null;
+    const nb = B ? B.bot.name : "Gegner";
+    const lead = !rb ? "Wartet auf den Gegner" : ra.bank > rb.bank ? `${esc(A.bot.name)} führt` : rb.bank > ra.bank ? `${esc(nb)} führt` : "Gleichstand";
+    return `<div class="panel race"><div class="lead">${lead}</div><div class="since">Duell seit ${esc(fStamp.format(new Date(started)))} · Ziel 100'000 CHF</div>
+      ${lane(A, ra, "la")}${rb ? lane(B, rb, "lb") : `<div class="lane lb"><div class="nm">${esc(nb)}</div><div class="amt">–</div><div class="meta"><span>Noch keine Daten vom Gegner</span></div></div>`}
+      <div class="scale"><span>100</span><span>1k</span><span>10k</span><span>100k</span></div>
+      ${rb ? raceChart(ra, rb) : ""}</div>`;
+  }
+  // Steuerung: nur sichtbar, wenn auf diesem Gerät der GitHub-Schlüssel der App gespeichert ist
+  let ctlMsg = "", armed = false, busy = false, manage = false;
+  function ctlHtml() {
+    if (!token()) return manage ? `<div class="panel ctl"><label for="tk">GitHub-Schlüssel (wie in der App)</label>
+      <div class="line"><input id="tk" type="password" autocomplete="off" placeholder="github_pat_…"><button class="btn ghost" data-act="token">Speichern</button></div>
+      <div class="msg">Wird nur auf diesem Gerät gespeichert. Danach erscheinen hier Start und Gegner-Link.</div></div>` : "";
+    const started = !!CFG.started;
+    return `<div class="panel ctl"><label for="pu">Link zur duel.json des Gegners</label>
+      <div class="line"><input id="pu" type="url" inputmode="url" placeholder="https://…/duel.json" value="${esc(CFG.partner_url || "")}"><button class="btn ghost" data-act="partner" ${busy ? "disabled" : ""}>Speichern</button></div>
+      <button class="btn ${armed ? "warn" : ""}" data-act="${armed ? "go" : "arm"}" ${busy ? "disabled" : ""}>${busy ? "Wird gespeichert …" : armed ? (started ? "Ja, neu starten (beide zurück auf 100)" : "Ja, jetzt starten") : started ? "Duell neu starten" : "Duell starten"}</button>
+      <div class="msg">${ctlMsg || (started ? "Neu starten setzt beide auf 100 CHF und zählt ab jetzt." : "Ab dem Start zählt jede Challenge-Wette beider Bots.")}</div></div>`;
+  }
+  async function dispatch(inputs) {
+    busy = true; armed = false; ctlMsg = "Auf GitHub gestartet. Das dauert etwa 1–2 Minuten …"; render();
+    const before = CFG.updated || "";
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/actions/workflows/daily.yml/dispatches`, {
+        method: "POST", headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + token(), "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: "main", inputs }) });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "GitHub-Schlüssel abgelehnt" : "GitHub-Fehler " + r.status);
+      const t0 = Date.now();
+      while (Date.now() - t0 < 300e3) {
+        await new Promise((ok) => setTimeout(ok, 6000));
+        const c = await fetch("duel-config.json?t=" + Date.now(), { cache: "no-store" }).then((x) => x.json()).catch(() => ({}));
+        ctlMsg = `Auf GitHub gestartet · ${Math.round((Date.now() - t0) / 1000)} s`; render();
+        if ((c.updated || "") !== before) { busy = false; ctlMsg = "Gespeichert."; await boot(); return; }
+      }
+      throw new Error("dauert ungewöhnlich lange, später neu laden");
+    } catch (e) { busy = false; ctlMsg = "Hat nicht geklappt: " + e.message; render(); }
   }
 
   // ---------- Gleiche Spiele finden ----------
@@ -265,12 +382,13 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     if (!B) {
       app.innerHTML = head + `<div class="panel empty" style="margin-top:20px"><strong>${SRC[1] ? "Daten des Gegners nicht erreichbar" : "Gegner noch nicht verbunden"}</strong>${SRC[1]
         ? `Unter <code>${esc(SRC[1])}</code> kam keine gültige tippduell-Datei (${esc(errB)}). Die Datei muss öffentlich und ohne Login erreichbar sein.`
-        : "Sobald die URL zu seiner duel.json eingetragen ist, erscheint hier der Vergleich."}</div>` + soloView();
+        : "Sobald die URL zu seiner duel.json eingetragen ist, erscheint hier der Vergleich."}</div>
+        <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}` + soloView();
       return;
     }
     const firstOf = (bot) => bot.tips.reduce((m, t) => (!m || (t.placed || t.kickoff) < m ? t.placed || t.kickoff : m), null);
     const common = [firstOf(A), firstOf(B)].filter(Boolean).sort().pop();
-    const from = period === "common" ? common : null;
+    const from = period === "duel" && CFG.started ? CFG.started : period === "common" ? common : null;
     const sa = stats(A, from), sb = stats(B, from), ca = chStats(A), cb = chStats(B);
     const rows = [
       duelRow("Trefferquote", `${sa.won}/${sa.done} · ${sb.won}/${sb.done}`, sa.rate, sb.rate, pct),
@@ -288,8 +406,10 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     let pa = 0, pb = 0; cmp.forEach(([x, y]) => { if (x != null && y != null) { if (x > y) pa++; else if (y > x) pb++; } });
     const ov = overlaps(from);
     app.innerHTML = head + `
+      <h2 class="sec">Duell 100 → 100'000</h2>${raceHtml()}${ctlHtml()}
       <div class="score ${pa > pb ? "lead-a" : pb > pa ? "lead-b" : ""}"><b>${pa}</b><span style="align-self:center">Kategorien</span><b>${pb}</b></div>
       <div class="chips" role="group" aria-label="Zeitraum">
+        ${CFG.started ? `<button class="chip" data-p="duel" aria-pressed="${period === "duel"}">Seit Duell-Start</button>` : ""}
         <button class="chip" data-p="common" aria-pressed="${period === "common"}">Seit gemeinsamem Start${common ? " (" + esc(fDate.format(new Date(common))) + ")" : ""}</button>
         <button class="chip" data-p="all" aria-pressed="${period === "all"}">Alles</button></div>
       <h2 class="sec">Tipps</h2>
@@ -297,7 +417,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
       <p class="note">Gezählt werden nur live abgegebene Tipps (keine nachträglich berechneten). Gewinn und ROI: 1 Einheit Einsatz pro Tipp, nur Tipps mit echter Buchmacher-Quote. ◆ = vorne.</p>
       <h2 class="sec">Trefferquote im Verlauf</h2>
       <div class="panel"><div class="legend"><span><i style="background:var(--a)"></i>${esc(nameA)}</span><span><i style="background:var(--b)"></i>${esc(nameB)}</span></div><div style="padding:6px 8px 10px">${chartSvg(from)}</div></div>
-      <h2 class="sec">Challenge 100 → 100'000</h2>
+      <h2 class="sec">Challenge (gesamt)</h2>
       <div class="two">${chCard(A, ca, "")}${chCard(B, cb, "bside")}</div>
       <h2 class="sec">Gleiche Spiele</h2>
       <div class="panel">${ov.length ? `<ul class="same">${ov.slice(0, 40).map(([a, b]) => `<li><div class="m">${esc(a.home)} – ${esc(a.away)} · ${esc(fDay.format(new Date(a.kickoff)))}${a.score ? " · " + esc(a.score) : ""}</div>
@@ -308,7 +428,7 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
       <div class="lists one-${mobSide}" style="margin-top:10px">
         <div class="panel la"><div class="head">${esc(nameA)}</div><ul class="tips">${recent(A, from)}</ul></div>
         <div class="panel lb"><div class="head">${esc(nameB)}</div><ul class="tips">${recent(B, from)}</ul></div></div>
-      <footer>Format tippduell/1 · Daten: <a href="${esc(SRC[0])}" style="color:inherit">${esc(nameA)}</a> · <a href="${esc(SRC[1])}" style="color:inherit">${esc(nameB)}</a></footer>`;
+      <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1 · Daten: <a href="${esc(SRC[0])}" style="color:inherit">${esc(nameA)}</a> · <a href="${esc(SRC[1])}" style="color:inherit">${esc(nameB)}</a></footer>`;
   }
   const recent = (bot, from) => bot.tips.filter((t) => inPeriod(t, from)).sort((x, y) => (y.kickoff > x.kickoff ? 1 : -1)).slice(0, 15).map(tipLi).join("") || `<li class="muted">Noch keine Tipps.</li>`;
   function soloView() {
@@ -316,14 +436,32 @@ footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
     return `<h2 class="sec">${esc(A.bot.name)} bisher</h2>
       <div class="panel rows">${duelRow("Trefferquote", `${s.won}/${s.done}`, s.rate, null, pct)}${duelRow("Gewinn", "Einheiten, nur echte Quoten", s.profit, null, (v) => signed(v))}${duelRow("Tipps", "abgegeben", s.tips, null, (v) => String(v ?? "–"))}</div>
       <h2 class="sec">Challenge</h2><div class="two">${chCard(A, c, "")}</div>
-      <h2 class="sec">Letzte Tipps</h2><div class="panel"><ul class="tips">${recent(A, null)}</ul></div>`;
+      <h2 class="sec">Letzte Tipps</h2><div class="panel"><ul class="tips">${recent(A, null)}</ul></div>
+      <footer><a href="#" data-act="manage" style="color:inherit">Verwalten</a> · Format tippduell/1</footer>`;
   }
   document.addEventListener("click", (e) => {
     const p = e.target.closest("[data-p]"); if (p) { period = p.dataset.p; render(); return; }
-    const s = e.target.closest("[data-s]"); if (s) { mobSide = s.dataset.s; render(); }
+    const s = e.target.closest("[data-s]"); if (s) { mobSide = s.dataset.s; render(); return; }
+    const c = e.target.closest("[data-act]"); if (!c || busy) return;
+    e.preventDefault();
+    if (c.dataset.act === "arm") { armed = true; render(); setTimeout(() => { if (armed) { armed = false; render(); } }, 6000); }
+    else if (c.dataset.act === "go") dispatch({ duel: "start" });
+    else if (c.dataset.act === "manage") { manage = true; render(); setTimeout(() => { const el = $(".ctl"); if (el) el.scrollIntoView({ block: "center", behavior: "smooth" }); }, 50); }
+    else if (c.dataset.act === "token") { const v = ($("#tk").value || "").trim(); if (v) { try { localStorage.setItem("go-gh-token", v); } catch (er) { /* egal */ } } render(); }
+    else if (c.dataset.act === "partner") {
+      const v = ($("#pu").value || "").trim();
+      if (!/^https:\/\/[^\s<>"']+$/.test(v)) { ctlMsg = "Bitte einen vollständigen https-Link eingeben."; render(); return; }
+      dispatch({ duel_partner: v });
+    }
   });
-  Promise.all([load(SRC[0]).catch(() => null), SRC[1] ? load(SRC[1]).catch((e) => { errB = e.message; return null; }) : Promise.resolve(null)])
-    .then(([a, b]) => { A = a; B = b; render(); });
+  async function boot() {
+    CFG = await fetch("duel-config.json?t=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    SRC[1] = qs.get("b") || CFG.partner_url || PARTNER_URL;
+    if (CFG.started && period === "common") period = "duel";
+    const [a, b] = await Promise.all([load(SRC[0]).catch(() => null), SRC[1] ? load(SRC[1]).catch((e) => { errB = e.message; return null; }) : Promise.resolve(null)]);
+    A = a; B = b; render();
+  }
+  boot();
 })();
 </script>
 </body>
