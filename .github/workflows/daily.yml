@@ -1,5 +1,5 @@
 name: GoalOracle
-run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || 'Zeitplan') || (inputs.send_only && 'Top 5 an Telegram' || ((inputs.duel != '' || inputs.duel_partner != '') && 'Tippduell' || (inputs.job == 'morning' && 'Zeitplan 10 Uhr (cron-job.org)' || (inputs.job == 'refresh' && 'Aktualisierung (cron-job.org)' || 'Manueller Lauf')))) }}
+run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || (github.event.schedule == '*/10 * * * *' && 'Challenge-Wächter' || 'Zeitplan')) || (inputs.send_only && 'Top 5 an Telegram' || ((inputs.duel != '' || inputs.duel_partner != '') && 'Tippduell' || (inputs.job == 'morning' && 'Zeitplan 10 Uhr (cron-job.org)' || (inputs.job == 'refresh' && 'Aktualisierung (cron-job.org)' || (inputs.job == 'watch' && 'Challenge-Wächter' || 'Manueller Lauf'))))) }}
 
 on:
   schedule:
@@ -11,6 +11,8 @@ on:
     - cron: "15 2 * * 1"
     # Alle 2 Stunden: Resultate, Spielpläne, Bilanz und Prognosen aktualisieren (ohne Nachricht, ohne neue Quoten)
     - cron: "5 */2 * * *"
+    # Reserve für den Challenge-Wächter (Anpfiff/Abpfiff). Pünktlich kommt er über cron-job.org (job=watch).
+    - cron: "*/10 * * * *"
   workflow_dispatch:
     inputs:
       notify:
@@ -44,11 +46,13 @@ on:
 
 permissions:
   contents: write   # Tipps, Bilanz und Cache speichern
+  actions: write    # der Wächter startet nach einer entschiedenen Wette einen normalen Lauf
   pages: write      # Web-App veröffentlichen
   id-token: write
 
 concurrency:
-  group: goaloracle
+  # Der Wächter läuft in einer eigenen Gruppe, damit er keine wartenden grossen Läufe verdrängt
+  group: ${{ ((github.event_name == 'workflow_dispatch' && inputs.job == 'watch') || github.event.schedule == '*/10 * * * *') && 'goaloracle-watch' || 'goaloracle' }}
   cancel-in-progress: false
 
 jobs:
@@ -71,6 +75,7 @@ jobs:
             CRON="${{ github.event.schedule }}"
             if [ "$CRON" = "15 2 * * 1" ]; then ARGS="--retune"
             elif [ "$CRON" = "5 */2 * * *" ]; then ARGS=""
+            elif [ "$CRON" = "*/10 * * * *" ]; then ARGS="--watch"
             elif [ "$OFF" = "+0200" ] && [ "$CRON" = "35 7 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"
             elif [ "$OFF" = "+0100" ] && [ "$CRON" = "35 8 * * *" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"
             else RUN=false; fi
@@ -81,9 +86,10 @@ jobs:
             if [ "${{ inputs.send_only }}" = "true" ]; then ARGS="--send-only"; fi
             if [ "${{ inputs.job }}" = "morning" ]; then ARGS="--notify --send-at 10:00 --refresh-odds --once"; fi
             if [ "${{ inputs.job }}" = "refresh" ]; then ARGS=""; fi
+            if [ "${{ inputs.job }}" = "watch" ]; then ARGS="--watch"; fi
             if [ -n "$DUEL" ] || [ -n "$DUEL_PARTNER" ]; then ARGS="--duel"; fi
           fi
-          SEND=false; case "$ARGS" in *--send-only*) SEND=true;; esac
+          SEND=false; case "$ARGS" in *--send-only*|*--watch*) SEND=true;; esac
           echo "send=$SEND" >> "$GITHUB_OUTPUT"
           echo "run=$RUN" >> "$GITHUB_OUTPUT"
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
@@ -106,6 +112,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DUEL_ACTION: ${{ inputs.duel }}
           DUEL_PARTNER: ${{ inputs.duel_partner }}
         run: python bot.py ${{ steps.plan.outputs.args }}

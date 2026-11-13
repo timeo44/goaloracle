@@ -114,3 +114,11 @@ PAPER = {
     "combo_min_odds": 1.35,    # sonst lohnt sich die Kombi nicht
     "combo_stake_factor": 0.5, # halber Einsatz
 }
+
+
+# Telegram: welche Nachrichten automatisch gesendet werden.
+# Die Challenge (neue Wette, Anpfiff, Abpfiff mit Resultat) wird immer gemeldet.
+TELEGRAM = {
+    "top5": False,   # tägliche Top 5 um 10:00 (der Knopf «Top 5 an Telegram senden» geht trotzdem)
+    "paper": False,  # Wetten des Spielgeld-Kontos (Testlauf)
+}

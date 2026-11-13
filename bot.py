@@ -176,6 +176,35 @@ def paper_text(new_bets: list[dict], paper: dict, site: str) -> str:
     return "\n\n".join(lines)
 
 
+def tg_sender():
+    """Gibt eine Funktion zurück, die an die Gruppe (sonst privat) sendet, oder print ohne Token."""
+    token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not owner:
+        return print
+    tg_file = ROOT / "cache" / "telegram.json"
+    tg = TG.load(tg_file)
+
+    def send(text):
+        TG.send(token, tg.get("chat_id") or owner, text, tg)
+        TG.save(tg_file, tg)
+    return send
+
+
+def watch_run(now) -> int:
+    import watch as W
+    repo, gh = os.getenv("GITHUB_REPOSITORY"), os.getenv("GITHUB_TOKEN")
+
+    def dispatch():
+        if not repo or not gh:
+            print("(kein GITHUB_TOKEN: normaler Lauf nicht gestartet)")
+            return
+        r = requests.post(f"https://api.github.com/repos/{repo}/actions/workflows/daily.yml/dispatches",
+                          headers={"Authorization": f"Bearer {gh}", "Accept": "application/vnd.github+json"},
+                          json={"ref": "main", "inputs": {"job": "refresh"}}, timeout=30)
+        print(f"Normaler Lauf angestossen: HTTP {r.status_code}")
+    return W.run(ROOT, label, tg_sender(), dispatch, now)
+
+
 def duel_config(now) -> int:
     """Tippduell: Startzeit und Gegner-URL in web/duel-config.json festhalten."""
     action = (os.getenv("DUEL_ACTION") or "").strip()
@@ -232,6 +261,7 @@ def main():
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
     ap.add_argument("--once", action="store_true",
                     help="Morgen-Nachricht nur einmal pro Tag (falls schon gesendet: keine Nachricht, keine neuen Quoten)")
+    ap.add_argument("--watch", action="store_true", help="Challenge: Anpfiff/Abpfiff melden (schnell, ohne Modell)")
     ap.add_argument("--duel", action="store_true", help="Tippduell starten/stoppen/Gegner setzen (DUEL_ACTION, DUEL_PARTNER)")
     ap.add_argument("--send-only", action="store_true", help="Nur die heutigen Top 5 an Telegram senden, nichts rechnen")
     args = ap.parse_args()
@@ -241,6 +271,8 @@ def main():
         return send_only(now)
     if args.duel:
         return duel_config(now)
+    if args.watch:
+        return watch_run(now)
     if args.once:
         prev = load_json(WEB / "botd.json", None) or {"days": []}
         today = B.local_day(now)
@@ -363,6 +395,10 @@ def main():
     token, owner = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
     tg_file = ROOT / "cache" / "telegram.json"
     tg = TG.find_group(token, owner, tg_file) if token and owner and not args.dry_run else {}
+    # Telegram: nur noch Challenge. Neue Wetten (und Ziel erreicht) meldet dieser Lauf,
+    # Anpfiff und Abpfiff mit Resultat meldet der Wächter (watch.py).
+    chal_events = [e for e in chal_events if e[0] in ("placed", "goal")]
+    new_paper = new_paper if C.TELEGRAM.get("paper") else []
     if chal_events:
         ctext = challenge_text(chal_events, os.getenv("SITE_URL", ""))
         if args.dry_run or not token or not owner:
@@ -386,6 +422,9 @@ def main():
             except RuntimeError as err:
                 print(f"Testlauf-Nachricht fehlgeschlagen: {err}")
     if not args.notify and not args.dry_run:
+        return
+    if not C.TELEGRAM.get("top5") and not args.dry_run:
+        print("Top-5-Nachricht ist ausgeschaltet (config.TELEGRAM).")
         return
     site = os.getenv("SITE_URL", "")
     today = B.local_day(now)
