@@ -153,6 +153,16 @@ h2.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .crest.lg { width: 64px; height: 64px; }
 .crest.lg.fb { width: 64px; height: 44px; font-size: 20px; }
 
+/* ---------- Suche ---------- */
+.search { position: relative; margin: 12px 0 10px; }
+.search svg { position: absolute; left: 12px; top: 50%; width: 17px; height: 17px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.search input { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 10px 38px 10px 37px; width: 100%; font-size: 16px; }
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button { display: none; }
+.search input:focus { outline: none; border-color: var(--ink); }
+.search .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); appearance: none; border: 0; background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1; }
+.search .clear:hover { color: var(--ink); }
+
 /* ---------- Filter ---------- */
 .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 4px; scrollbar-width: thin; }
 .chip {
@@ -601,6 +611,11 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   <section class="view" id="view-spiele">
     <div class="seg spseg" role="group" aria-label="Ansicht"><button type="button" data-go="spiele" aria-pressed="true">Spiele</button><button type="button" data-go="ranking" aria-pressed="false">Ranking</button></div>
+    <div class="search" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="match-q" placeholder="Team oder Wettbewerb suchen" aria-label="Spiele durchsuchen" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+      <button type="button" class="clear" id="match-q-clear" aria-label="Suche löschen" hidden>×</button>
+    </div>
     <div class="chips" id="comp-chips" role="group" aria-label="Wettbewerb"></div>
     <div id="slips"></div>
     <div id="matches"></div>
@@ -1020,14 +1035,57 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   function visibleMatches() {
     return data.upcoming.filter((u) => settings.comps[u.comp] && (compFilter === "all" || u.comp === compFilter));
   }
+  // Suche: Teamname, Kürzel oder Wettbewerb, ohne Rücksicht auf Akzente und Gross/Klein.
+  // Mehrere Wörter müssen alle vorkommen («bayern dfb», «real madrid»).
+  let matchQuery = "";
+  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/ß/g, "ss").replace(/ø/g, "o").replace(/æ/g, "ae").replace(/[^a-z0-9]+/g, " ").trim();
+  // Zusätzliche Suchbegriffe: deutsche Namen und gängige Vollnamen zu den kurzen ESPN-Namen
+  const ALIAS = {
+    "bayern": "bayern munchen munich fcb", "cologne": "koln 1 fc koln", "gladbach": "monchengladbach borussia bmg",
+    "dortmund": "borussia bvb", "leverkusen": "bayer 04", "frankfurt": "eintracht sge", "rb leipzig": "rasenballsport",
+    "stuttgart": "vfb", "freiburg": "sc", "hoffenheim": "tsg", "schalke": "s04", "union berlin": "eisern",
+    "man city": "manchester city", "man united": "manchester united", "man utd": "manchester united", "spurs": "tottenham hotspur",
+    "c palace": "crystal palace", "nottm forest": "nottingham forest", "wolves": "wolverhampton", "newcastle": "united",
+    "psg": "paris saint germain", "st etienne": "saint etienne", "inter": "inter mailand milan internazionale",
+    "ac milan": "mailand", "juventus": "juve turin", "as roma": "rom", "napoli": "neapel", "atletico": "atletico madrid atleti",
+    "barcelona": "barca", "betis": "real betis", "athletic": "athletic bilbao", "rayo": "rayo vallecano", "deportivo": "la coruna",
+    "germany": "deutschland", "switzerland": "schweiz nati", "austria": "osterreich", "france": "frankreich", "italy": "italien",
+    "spain": "spanien", "england": "", "netherlands": "niederlande holland", "belgium": "belgien", "portugal": "",
+    "denmark": "danemark", "sweden": "schweden", "norway": "norwegen", "finland": "finnland", "iceland": "island",
+    "poland": "polen", "czechia": "tschechien", "slovakia": "slowakei", "slovenia": "slowenien", "croatia": "kroatien",
+    "serbia": "serbien", "bosnia herz": "bosnien herzegowina", "montenegro": "", "albania": "albanien", "kosovo": "",
+    "north macedonia": "nordmazedonien", "greece": "griechenland", "turkiye": "turkei", "cyprus": "zypern",
+    "hungary": "ungarn", "romania": "rumanien", "bulgaria": "bulgarien", "ukraine": "", "belarus": "weissrussland belarus",
+    "moldova": "moldau", "georgia": "georgien", "armenia": "armenien", "kazakhstan": "kasachstan", "israel": "",
+    "scotland": "schottland", "wales": "", "n ireland": "nordirland", "rep ireland": "irland", "faroe islands": "faroer",
+    "estonia": "estland", "latvia": "lettland", "lithuania": "litauen", "luxembourg": "luxemburg", "malta": "",
+    "gibraltar": "", "san marino": "", "liechtenstein": "",
+  };
+  const searchCache = new WeakMap();
+  function searchText(u) {
+    let t = searchCache.get(u);
+    if (t === undefined) {
+      const al = (n) => ALIAS[norm(n)] || "";
+      t = " " + norm([u.home.name, u.home.tla, al(u.home.name), u.away.name, u.away.tla, al(u.away.name), compName(u.comp), compName(u.comp, true)].join(" "));
+      searchCache.set(u, t);
+    }
+    return t;
+  }
+  function searchHit(u) {
+    const q = norm(matchQuery);
+    if (!q) return true;
+    const t = searchText(u);
+    return q.split(" ").every((w) => t.includes(" " + w) || (w.length >= 3 && t.includes(w)));
+  }
   function renderChips() {
     const counts = {};
-    data.upcoming.forEach((u) => { if (settings.comps[u.comp]) counts[u.comp] = (counts[u.comp] || 0) + 1; });
+    data.upcoming.forEach((u) => { if (settings.comps[u.comp] && searchHit(u)) counts[u.comp] = (counts[u.comp] || 0) + 1; });
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    if (compFilter !== "all" && !counts[compFilter]) compFilter = "all";
+    if (compFilter !== "all" && !counts[compFilter] && !matchQuery) compFilter = "all";
     let h = `<button class="chip" type="button" data-c="all" aria-pressed="${compFilter === "all"}">Alle<small>${total}</small></button>`;
     Object.keys(data.comps).forEach((k) => {
-      if (counts[k]) h += `<button class="chip" type="button" data-c="${k}" aria-pressed="${compFilter === k}">${esc(compName(k))}<small>${counts[k]}</small></button>`;
+      if (counts[k] || k === compFilter) h += `<button class="chip" type="button" data-c="${k}" aria-pressed="${compFilter === k}">${esc(compName(k))}<small>${counts[k] || 0}</small></button>`;
     });
     $("#comp-chips").innerHTML = h;
   }
@@ -1035,6 +1093,20 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     const b = e.target.closest(".chip"); if (!b) return;
     compFilter = b.dataset.c; store.set("go-comp", compFilter); renderMatches();
   });
+
+  const qInput = $("#match-q"), qClear = $("#match-q-clear");
+  let qTimer = 0;
+  qInput.addEventListener("input", () => {
+    qClear.hidden = !qInput.value;
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => { matchQuery = qInput.value; renderMatches(); }, 120);
+  });
+  qInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && qInput.value) { e.preventDefault(); clearSearch(); }
+    if (e.key === "Enter") qInput.blur();
+  });
+  qClear.addEventListener("click", () => { clearSearch(); qInput.focus(); });
+  function clearSearch() { clearTimeout(qTimer); qInput.value = ""; qClear.hidden = true; matchQuery = ""; renderMatches(); }
 
   function card(u) {
     const d = new Date(u.kickoff), [p1, px, p2] = u.p, pk = bestPick(u);
@@ -1095,9 +1167,15 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
 
   function renderMatches() {
     renderChips();
-    const list = visibleMatches();
-    const slips = buildSlips();
+    const searching = !!norm(matchQuery);
+    const list = visibleMatches().filter(searchHit);
+    const slips = searching ? [] : buildSlips();
     $("#slips").innerHTML = slips.length ? `<h2 class="sec" style="margin-top:14px">Kombi-Vorschläge · nächste 48 Std.</h2><div class="slips">${slips.map(slipHtml).join("")}</div>` : "";
+    if (!list.length && searching) {
+      const other = compFilter !== "all" && data.upcoming.some((u) => settings.comps[u.comp] && searchHit(u));
+      $("#matches").innerHTML = `<div class="empty"><strong>Nichts gefunden</strong>Kein Spiel passt zu «${esc(matchQuery.trim())}»${other ? ` in ${esc(compName(compFilter))}.<br><button type="button" class="chip" id="match-q-all" style="margin-top:14px">In allen Wettbewerben suchen</button>` : `. Gesucht wird in Teamnamen, Kürzeln und Wettbewerben der nächsten ${data.days_ahead} Tage.`}</div>`;
+      return;
+    }
     if (!list.length) {
       $("#matches").innerHTML = `<div class="empty"><strong>Keine Spiele</strong>In den nächsten ${data.days_ahead} Tagen sind in den gewählten Wettbewerben keine Spiele angesetzt.</div>`;
       return;
@@ -1134,7 +1212,10 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
     if (more) more.innerHTML = matchShown < matchList.length
       ? `<button type="button" class="chip" id="match-more-btn" style="margin:18px auto;display:block">Weitere ${matchList.length - matchShown} Spiele anzeigen</button>` : "";
   }
-  document.addEventListener("click", (e) => { if (e.target.closest("#match-more-btn")) appendMatches(40); });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#match-more-btn")) appendMatches(40);
+    if (e.target.closest("#match-q-all")) { compFilter = "all"; store.set("go-comp", compFilter); renderMatches(); }
+  });
 
   // ---------- Tipps-Tab ----------
   const tp = Object.assign({ kind: "single", hours: 48, legs: 2 }, store.get("go-tp") || {});
