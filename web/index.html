@@ -385,6 +385,14 @@ form.sim { display: grid; gap: 14px; }
 @media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
 .btn:disabled { opacity: .55; cursor: progress; }
 .spseg { max-width: 300px; margin-bottom: 12px; }
+.swap-ctl { display: inline-flex; align-items: center; gap: 8px; }
+.swap-btn { appearance: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: 700 13px/1 var(--font-body); cursor: pointer; font-variant-numeric: tabular-nums; }
+.swap-btn svg { width: 18px; height: 18px; }
+.swap-btn:disabled { opacity: .5; }
+.swap-act { margin-top: 12px; display: grid; gap: 6px; }
+.swap-act .note { margin: 0; }
+.swap-act .btn.confirm { background: var(--bad); }
+.ch-bet.preview { border-style: dashed; }
 .duel-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13px; }
 .duel-status .dlabel { font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .dpill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
@@ -1880,6 +1888,63 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
   const fmtChf = (x) => Math.round(x).toLocaleString("de-CH");
   const chPos = (x) => Math.max(0, Math.min(1, Math.log(Math.max(x, 100) / 100) / Math.log(1000)));
   const legLbl = (l) => esc(label(l.key, { home: { name: l.home }, away: { name: l.away } }));
+  // ---------- Challenge: Wette wechseln (nur mit GitHub-Schlüssel auf diesem Gerät) ----------
+  const betSig = (legs) => legs.map((l) => `${l.id}:${l.key}`).join(",");
+  const chSw = { idx: 0, forSig: "", busy: false, armed: false, msg: "" };
+  function swapInfo(open) {
+    const opts = open.options || [];
+    const started = open.legs.some((l) => new Date(l.kickoff).getTime() <= Date.now() + 5 * 60e3);
+    const can = !!ghToken() && opts.length > 1 && !started;
+    if (chSw.forSig !== betSig(open.legs)) { chSw.forSig = betSig(open.legs); chSw.idx = 0; chSw.armed = false; }
+    const curIdx = Math.max(0, opts.findIndex((o) => betSig(o.legs) === betSig(open.legs)));
+    if (!can) return { can: false };
+    const i = ((chSw.idx % opts.length) + opts.length) % opts.length;
+    // Reihenfolge so, dass die aktuelle Wette zuerst kommt
+    const order = [curIdx, ...opts.map((_, k) => k).filter((k) => k !== curIdx)];
+    const o = opts[order[i]];
+    return { can: true, n: opts.length, i, o, isCur: order[i] === curIdx };
+  }
+  function betCard(open, legsHtml) {
+    const sw = swapInfo(open);
+    const shown = sw.can ? { ...open, legs: sw.o.legs, p: sw.o.p, odds: sw.o.odds } : open;
+    const head = sw.can
+      ? `<div class="row"><h3>${shown.legs.length > 1 ? shown.legs.length + "er-Kombi" : "Einzeltipp"}</h3>
+          <span class="swap-ctl">${sw.isCur ? `<span class="status open">aktuell</span>` : `<span class="status">Vorschlag</span>`}
+          <button type="button" class="swap-btn" data-swap="next" aria-label="Andere Wette anzeigen" title="Andere Wette anzeigen" ${chSw.busy ? "disabled" : ""}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15"/><path d="M15 4l4 4-4 4"/><path d="M20 16H5"/><path d="M9 12l-4 4 4 4"/></svg>
+            <span>${sw.i + 1}/${sw.n}</span></button></span></div>`
+      : `<div class="row"><h3>${open.legs.length > 1 ? open.legs.length + "er-Kombi" : "Einzeltipp"}</h3><span class="status open">läuft</span></div>`;
+    const action = !sw.can ? "" : chSw.busy ? `<div class="swap-act"><button class="btn" type="button" disabled>Wird gewechselt …</button><p class="note">${chSw.msg}</p></div>`
+      : sw.isCur ? (chSw.msg ? `<div class="swap-act"><p class="note">${chSw.msg}</p></div>` : `<div class="swap-act"><p class="note">Mit ⇄ siehst du ${sw.n - 1} andere Wetten um Quote 2. Wechseln geht bis kurz vor dem Anpfiff.</p></div>`)
+      : `<div class="swap-act"><button class="btn ${chSw.armed ? "confirm" : ""}" type="button" data-swap="${chSw.armed ? "go" : "arm"}" data-sig="${esc(betSig(sw.o.legs))}">${chSw.armed ? "Ja, zu dieser Wette wechseln" : "Diese Wette nehmen"}</button>
+          <p class="note">${chSw.msg || "Einsatz bleibt gleich. Die Gruppe bekommt eine Nachricht."}</p></div>`;
+    return `<div class="panel ch-bet${sw.can && !sw.isCur ? " preview" : ""}">${head}
+      <div style="margin-top:6px">${legsHtml(shown)}</div>
+      <div class="ch-flow"><b>${chf(open.stake)}</b><span class="arr">→</span><b class="pos-d">${chf(open.stake * shown.odds)}</b><span class="p">Quote ${shown.odds.toFixed(2)}<br>Chance ${pct(shown.p)}</span></div>${action}</div>`;
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-swap]"); if (!b || chSw.busy) return;
+    e.preventDefault();
+    if (b.dataset.swap === "next") { chSw.idx++; chSw.armed = false; chSw.msg = ""; renderChallenge(); return; }
+    if (b.dataset.swap === "arm") { chSw.armed = true; renderChallenge(); setTimeout(() => { if (chSw.armed) { chSw.armed = false; renderChallenge(); } }, 6000); return; }
+    const want = b.dataset.sig;
+    chSw.busy = true; chSw.armed = false; chSw.msg = "Auf GitHub gestartet …"; renderChallenge();
+    try {
+      const r = await ghFetch("/actions/workflows/daily.yml/dispatches", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: "main", inputs: { swap: want } }) });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "GitHub-Schlüssel abgelehnt" : "GitHub-Fehler " + r.status);
+      const t0 = Date.now();
+      while (Date.now() - t0 < 360e3) {
+        await new Promise((ok) => setTimeout(ok, 6000));
+        chSw.msg = `Wird gewechselt · ${Math.round((Date.now() - t0) / 1000)} s · meist 1–2 Minuten`; renderChallenge();
+        const d = await fetch("data.json?v=" + Date.now(), { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+        const a = d && d.challenge && d.challenge.attempts[d.challenge.attempts.length - 1];
+        const ob = a && a.bets.length ? a.bets[a.bets.length - 1] : null;
+        if (ob && betSig(ob.legs) === want) { data = d; chSw.busy = false; chSw.idx = 0; chSw.msg = `<span class="pos-d">Gewechselt.</span>`; renderChallenge(); return; }
+      }
+      throw new Error("dauert ungewöhnlich lange. Später neu laden.");
+    } catch (err) { chSw.busy = false; chSw.msg = `<span class="neg-d">Hat nicht geklappt: ${esc(err.message)}</span>`; renderChallenge(); }
+  });
   function renderChallenge() {
     const el = $("#view-challenge"), C = data.challenge;
     if (!C || !C.attempts || !C.attempts.length) {
@@ -1918,10 +1983,7 @@ footer.foot p { margin: 0 0 4px; max-width: 80ch; }
         <div class="sub">Ziel 100'000 CHF · noch rund ${need} Verdopplungen</div>
         <div class="ladder" aria-hidden="true"><span class="track"></span>${S.best_peak > att.bank ? `<span class="best" style="left:${chPos(S.best_peak) * 100}%" title="Rekord"></span>` : ""}<span class="fill" style="width:${Math.max(1.5, chPos(att.bank) * 100)}%"></span>${dots}${ticks}</div>
       </div>
-      ${open ? `<h2 class="sec" style="margin-top:22px">Aktuelle Wette</h2>
-      <div class="panel ch-bet"><div class="row"><h3>${open.legs.length > 1 ? open.legs.length + "er-Kombi" : "Einzeltipp"}</h3><span class="status open">läuft</span></div>
-        <div style="margin-top:6px">${legs(open)}</div>
-        <div class="ch-flow"><b>${chf(open.stake)}</b><span class="arr">→</span><b class="pos-d">${chf(open.stake * open.odds)}</b><span class="p">Quote ${open.odds.toFixed(2)}<br>Chance ${pct(open.p)}</span></div></div>`
+      ${open ? `<h2 class="sec" style="margin-top:22px">Aktuelle Wette</h2>${betCard(open, legs)}`
       : `<div class="panel" style="margin-top:16px"><div class="empty"><strong>Gerade keine Wette offen</strong>Sobald es ein passendes Spiel in den nächsten 30 Stunden gibt, setzt GoalOracle die nächste. Geprüft wird alle 2 Stunden.</div></div>`}
       <dl class="kpis" style="margin-top:16px">
         <div class="kpi"><dt data-tip="Wie viele Anläufe es seit dem Start gab. Jede verlorene Wette beendet einen Versuch.">Versuche</dt><dd>${S.attempts}<small>seit ${esc(fDate.format(new Date(C.since)))}</small></dd></div>

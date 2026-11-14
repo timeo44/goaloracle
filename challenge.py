@@ -47,8 +47,22 @@ def _legs(upcoming, now):
     return out
 
 
+N_OPTIONS = 4            # so viele Wetten stehen beim Wechseln zur Auswahl
+
+
+def sig(legs) -> str:
+    """Kennung einer Wette (welche Spiele, welcher Tipp)."""
+    return ",".join(f"{l['id']}:{l['key']}" for l in legs)
+
+
 def pick(upcoming, now) -> dict | None:
-    """Sicherste Wette: höchste Chance bei Gesamtquote 1.25–1.60."""
+    """Sicherste Wette um Quote 2 (die erste der Auswahl)."""
+    opts = pick_many(upcoming, now, 1)
+    return opts[0] if opts else None
+
+
+def pick_many(upcoming, now, n=N_OPTIONS) -> list[dict]:
+    """Die n sichersten Wetten mit Gesamtquote 1.85–2.30, beste zuerst."""
     legs = _legs(upcoming, now)
     cands = [[l] for l in legs if MIN_ODDS <= l["odds"] <= MAX_ODDS]
     strong = sorted([l for l in legs if l["p"] >= 0.60], key=lambda l: -l["p"])[:14]
@@ -56,19 +70,58 @@ def pick(upcoming, now) -> dict | None:
         for c in combinations(strong, n):
             if len({l["id"] for l in c}) == n and MIN_ODDS <= math.prod(l["odds"] for l in c) <= MAX_ODDS:
                 cands.append(list(c))
-    best = None
+    scored = []
     for c in cands:
         p = math.prod(l["p"] for l in c)
         o = math.prod(l["odds"] for l in c)
-        if p < MIN_P:
+        if p >= MIN_P:
+            scored.append(((round(p, 3), o), c, p, o))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    out, seen = [], set()
+    for _, legs, p, o in scored:
+        k = sig(legs)
+        if k in seen:
             continue
-        key = (round(p, 3), o)
-        if best is None or key > best[0]:
-            best = (key, c, p, o)
-    if not best:
-        return None
-    _, legs, p, o = best
-    return {"legs": [dict(l, status="open") for l in legs], "p": round(p, 3), "odds": round(o, 2)}
+        seen.add(k)
+        out.append({"legs": [dict(l, status="open") for l in legs], "p": round(p, 3), "odds": round(o, 2)})
+        if len(out) == n:
+            break
+    return out
+
+
+def _started(legs, now) -> bool:
+    return any(parse_date(l["kickoff"]) <= now + timedelta(minutes=5) for l in legs)
+
+
+def refresh_options(bet, upcoming, now) -> None:
+    """Auswahl zum Wechseln aktuell halten, solange noch kein Spiel der Wette begonnen hat."""
+    if _started(bet["legs"], now):
+        bet.pop("options", None)
+        return
+    cur = {"legs": [dict(l) for l in bet["legs"]], "p": bet["p"], "odds": bet["odds"]}
+    opts = [o for o in pick_many(upcoming, now, N_OPTIONS + 1) if sig(o["legs"]) != sig(cur["legs"])]
+    bet["options"] = [cur] + opts[:N_OPTIONS - 1]
+
+
+def swap(state: dict, wanted: str, now: datetime) -> tuple[bool, str, dict | None, dict | None]:
+    """Wechselt die offene Wette zu einer Wette aus ihrer Auswahl. Gibt (ok, Text, Versuch, Wette) zurück."""
+    att = state["attempts"][-1] if state.get("attempts") else None
+    bet = att["bets"][-1] if att and att["bets"] else None
+    if not bet or bet["status"] != "open":
+        return False, "Keine offene Wette.", None, None
+    if _started(bet["legs"], now):
+        return False, "Ein Spiel der Wette hat schon begonnen, Wechseln geht nicht mehr.", att, bet
+    if sig(bet["legs"]) == wanted:
+        return False, "Das ist schon die aktuelle Wette.", att, bet
+    opt = next((o for o in bet.get("options", []) if sig(o["legs"]) == wanted), None)
+    if not opt:
+        return False, "Diese Wette steht nicht mehr zur Auswahl.", att, bet
+    if _started(opt["legs"], now):
+        return False, "Ein Spiel dieser Wette hat schon begonnen.", att, bet
+    bet["swapped_from"] = sig(bet["legs"])
+    bet.update(legs=[dict(l, status="open") for l in opt["legs"]], p=opt["p"], odds=opt["odds"],
+               kickoff=max(l["kickoff"] for l in opt["legs"]), swapped=now.isoformat())
+    return True, "Gewechselt.", att, bet
 
 
 def _settle_leg(leg, e):
@@ -107,6 +160,7 @@ def update(state: dict | None, upcoming, by_id, now: datetime) -> tuple[dict, li
                 bet["status"] = "void" if all(s == "void" for s in st) else "won"
                 bet["payout"] = round(bet["stake"] * q, 2)
             else:
+                refresh_options(bet, upcoming, now)
                 break   # läuft noch: nichts Neues setzen
             bet["settled"] = now.isoformat()
             if bet["status"] == "lost":
@@ -123,10 +177,12 @@ def update(state: dict | None, upcoming, by_id, now: datetime) -> tuple[dict, li
                 _new_attempt(state, now)
             continue
         # keine offene Wette: die nächste setzen
-        choice = pick(upcoming, now)
-        if choice:
+        opts = pick_many(upcoming, now)
+        if opts:
+            choice = opts[0]
             nb = {"placed": now.isoformat(), "stake": att["bank"], "status": "open", "payout": None,
-                  "kickoff": max(l["kickoff"] for l in choice["legs"]), **choice}
+                  "kickoff": max(l["kickoff"] for l in choice["legs"]), **choice,
+                  "options": [{"legs": [dict(l) for l in o["legs"]], "p": o["p"], "odds": o["odds"]} for o in opts]}
             att["bets"].append(nb)
             events.append(("placed", att, nb))
         break

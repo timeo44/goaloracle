@@ -1,5 +1,5 @@
 name: GoalOracle
-run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || (github.event.schedule == '*/10 * * * *' && 'Challenge-Wächter' || 'Zeitplan')) || (inputs.send_only && 'Top 5 an Telegram' || ((inputs.duel != '' || inputs.duel_partner != '') && 'Tippduell' || (inputs.job == 'morning' && 'Zeitplan 10 Uhr (cron-job.org)' || (inputs.job == 'refresh' && 'Aktualisierung (cron-job.org)' || (inputs.job == 'watch' && 'Challenge-Wächter' || 'Manueller Lauf'))))) }}
+run-name: ${{ github.event_name == 'schedule' && (github.event.schedule == '5 */2 * * *' && 'Aktualisierung (alle 2 Std.)' || (github.event.schedule == '*/10 * * * *' && 'Challenge-Wächter' || 'Zeitplan')) || (inputs.swap != '' && 'Challenge – Wette wechseln' || (inputs.send_only && 'Top 5 an Telegram' || ((inputs.duel != '' || inputs.duel_partner != '') && 'Tippduell' || (inputs.job == 'morning' && 'Zeitplan 10 Uhr (cron-job.org)' || (inputs.job == 'refresh' && 'Aktualisierung (cron-job.org)' || (inputs.job == 'watch' && 'Challenge-Wächter' || 'Manueller Lauf')))))) }}
 
 on:
   schedule:
@@ -39,6 +39,10 @@ on:
         description: "Tippduell: URL zur duel.json des Gegners"
         type: string
         default: ""
+      swap:
+        description: "Challenge: Kennung der Wette, zu der gewechselt wird"
+        type: string
+        default: ""
       send_only:
         description: "Nur die heutigen Top 5 an Telegram senden (ohne Rechnen)"
         type: boolean
@@ -68,6 +72,7 @@ jobs:
         env:
           DUEL: ${{ inputs.duel }}
           DUEL_PARTNER: ${{ inputs.duel_partner }}
+          SWAP: ${{ inputs.swap }}
         run: |
           RUN=true; ARGS=""
           if [ "${{ github.event_name }}" = "schedule" ]; then
@@ -88,6 +93,7 @@ jobs:
             if [ "${{ inputs.job }}" = "refresh" ]; then ARGS=""; fi
             if [ "${{ inputs.job }}" = "watch" ]; then ARGS="--watch"; fi
             if [ -n "$DUEL" ] || [ -n "$DUEL_PARTNER" ]; then ARGS="--duel"; fi
+            if [ -n "$SWAP" ]; then ARGS="--swap"; fi
           fi
           SEND=false; case "$ARGS" in *--send-only*|*--watch*) SEND=true;; esac
           echo "send=$SEND" >> "$GITHUB_OUTPUT"
@@ -113,6 +119,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SWAP: ${{ inputs.swap }}
           DUEL_ACTION: ${{ inputs.duel }}
           DUEL_PARTNER: ${{ inputs.duel_partner }}
         run: python bot.py ${{ steps.plan.outputs.args }}

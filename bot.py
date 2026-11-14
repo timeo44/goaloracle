@@ -190,6 +190,33 @@ def tg_sender():
     return send
 
 
+def swap_run(now) -> int:
+    """Challenge: offene Wette gegen eine aus ihrer Auswahl tauschen (Knopf in der App)."""
+    wanted = (os.getenv("SWAP") or "").strip()
+    chal = load_json(WEB / "challenge.json", None)
+    if not chal or not wanted:
+        print("Nichts zu wechseln.")
+        return 1
+    ok, msg, att, bet = CH.swap(chal, wanted, now)
+    print(f"Wechseln: {msg}")
+    if not ok:
+        return 1
+    write_json(WEB / "challenge.json", chal)
+    data = load_json(WEB / "data.json", None)
+    if data is not None:
+        data["challenge"] = chal
+        write_json(WEB / "data.json", data)
+    write_json(WEB / "duel.json", DU.export(load_json(WEB / "botd.json", None) or {"days": []}, chal, label,
+                                            os.getenv("SITE_URL", ""), now))
+    text = challenge_text([("placed", att, bet)], os.getenv("SITE_URL", "")).replace(
+        "🏆 <b>Challenge</b>", "🔄 <b>Challenge · Wette gewechselt</b>", 1)
+    try:
+        tg_sender()(text)
+    except RuntimeError as err:
+        print(f"Telegram fehlgeschlagen: {err}")
+    return 0
+
+
 def watch_run(now) -> int:
     import watch as W
     repo, gh = os.getenv("GITHUB_REPOSITORY"), os.getenv("GITHUB_TOKEN")
@@ -261,6 +288,7 @@ def main():
     ap.add_argument("--skip-sim", action="store_true", help="Rückblick nicht neu rechnen")
     ap.add_argument("--once", action="store_true",
                     help="Morgen-Nachricht nur einmal pro Tag (falls schon gesendet: keine Nachricht, keine neuen Quoten)")
+    ap.add_argument("--swap", action="store_true", help="Challenge: offene Wette wechseln (Kennung in SWAP)")
     ap.add_argument("--watch", action="store_true", help="Challenge: Anpfiff/Abpfiff melden (schnell, ohne Modell)")
     ap.add_argument("--duel", action="store_true", help="Tippduell starten/stoppen/Gegner setzen (DUEL_ACTION, DUEL_PARTNER)")
     ap.add_argument("--send-only", action="store_true", help="Nur die heutigen Top 5 an Telegram senden, nichts rechnen")
@@ -273,6 +301,8 @@ def main():
         return duel_config(now)
     if args.watch:
         return watch_run(now)
+    if args.swap:
+        return swap_run(now)
     if args.once:
         prev = load_json(WEB / "botd.json", None) or {"days": []}
         today = B.local_day(now)
